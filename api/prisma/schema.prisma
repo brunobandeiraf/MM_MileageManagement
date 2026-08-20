@@ -1,0 +1,50 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  FUNCIONARIO
+  USER
+}
+
+enum UserType {
+  GESTAO
+  ASSINANTE
+}
+
+model User {
+  id                         String    @id @default(uuid())
+  name                       String    @db.VarChar(255)
+  email                      String    @unique @db.VarChar(255)
+  phone                      String    @default("") @db.VarChar(20)
+  avatar_url                 String?
+  password_hash              String?
+  password_reset_token_hash  String?   @unique
+  password_reset_expires_at  DateTime? @db.Timestamptz
+  role                       Role      @default(USER)
+  user_type                  UserType  @default(GESTAO)
+  created_at                 DateTime  @default(now()) @db.Timestamptz
+  updated_at                 DateTime  @updatedAt @db.Timestamptz
+
+  @@map("users")
+}
+
+model Lead {
+  id                 String   @id @default(uuid())
+  name               String   @db.VarChar(255)
+  whatsapp           String   @db.VarChar(20)
+  email              String   @db.VarChar(255)
+  monthly_card_spend String   @db.VarChar(50)
+  trips_per_year     String?  @db.VarChar(50)
+  created_at         DateTime @default(now()) @db.Timestamptz
+
+  @@map("leads")
+}

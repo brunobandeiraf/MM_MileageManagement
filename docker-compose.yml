@@ -1,0 +1,41 @@
+services:
+  # ─── Banco de dados local ────────────────────────────────────────
+  # Sobe apenas o Postgres para desenvolvimento.
+  # A API roda fora do Docker com: cd api && npm run dev
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mundimilhas
+      POSTGRES_PASSWORD: mundimilhas_dev
+      POSTGRES_DB: mundimilhas_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mundimilhas -d mundimilhas_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ─── API containerizada (opcional, para testar o build Docker) ───
+  # Use: docker compose --profile docker up
+  api:
+    profiles: ["docker"]
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    env_file:
+      - ./api/.env
+    environment:
+      DATABASE_URL: "postgresql://mundimilhas:mundimilhas_dev@postgres:5432/mundimilhas_db"
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

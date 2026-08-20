@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "Role" ADD VALUE 'FUNCIONARIO';
+
+-- AlterTable
+ALTER TABLE "users" ADD COLUMN     "phone" VARCHAR(20) NOT NULL DEFAULT '';

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+.env.*
+*.log
+logs/
+coverage/
+tests/
+*.test.ts
+*.spec.ts
+.git/
+.github/
+README.md
