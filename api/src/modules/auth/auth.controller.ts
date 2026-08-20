@@ -161,3 +161,41 @@ export async function updateMe(req: Request, res: Response, next: NextFunction):
     next(err);
   }
 }
+
+/**
+ * PUT /auth/me/password
+ *
+ * Self-service password change for the authenticated user. Requires the
+ * current password for confirmation.
+ */
+export async function changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { currentPassword, newPassword } = req.body as {
+      currentPassword?: string;
+      newPassword?: string;
+    };
+
+    const missingFields: string[] = [];
+    if (!currentPassword) missingFields.push('currentPassword');
+    if (!newPassword) missingFields.push('newPassword');
+
+    if (missingFields.length > 0) {
+      res.status(400).json({ error: 'Campos obrigatórios ausentes', fields: missingFields });
+      return;
+    }
+
+    if (newPassword!.length < MIN_PASSWORD_LENGTH) {
+      res.status(400).json({ error: `A nova senha deve ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres` });
+      return;
+    }
+
+    await authService.changeMyPassword(req.user.id, currentPassword!, newPassword!);
+    res.status(200).json({ message: 'Senha alterada com sucesso' });
+  } catch (err) {
+    if (err instanceof AppError) {
+      res.status(err.statusCode).json({ error: err.message });
+      return;
+    }
+    next(err);
+  }
+}

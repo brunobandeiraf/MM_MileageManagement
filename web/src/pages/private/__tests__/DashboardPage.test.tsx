@@ -16,6 +16,7 @@ function renderDashboard(user: User) {
     login: vi.fn(),
     logout: vi.fn(),
     updateProfile: vi.fn(),
+    changePassword: vi.fn(),
   };
   return render(
     <ThemeContext.Provider value={mockTheme}>

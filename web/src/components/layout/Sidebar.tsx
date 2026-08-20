@@ -22,7 +22,7 @@ export function Sidebar({ isSidebarOpen, onClose }: SidebarProps) {
       {/* Top Section — Logo */}
       <div className="flex items-center justify-between px-5 py-5">
         <div className="flex items-center gap-3">
-          <Plane className="h-7 w-7 text-amber-500" aria-hidden="true" />
+          <Plane className="h-7 w-7 text-blue-600 dark:text-amber-500" aria-hidden="true" />
           <div>
             <p className="text-base font-bold leading-tight text-foreground">
               Mundo Milhas
@@ -63,7 +63,7 @@ export function Sidebar({ isSidebarOpen, onClose }: SidebarProps) {
                   'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors',
                   isActive
                     ? 'bg-primary/10 font-medium text-primary'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    : 'text-muted-foreground hover:bg-blue-50 hover:text-foreground dark:hover:bg-accent dark:hover:text-accent-foreground',
                 )
               }
             >
@@ -85,7 +85,7 @@ export function Sidebar({ isSidebarOpen, onClose }: SidebarProps) {
                     'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors',
                     isActive
                       ? 'bg-primary/10 font-medium text-primary'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                      : 'text-muted-foreground hover:bg-blue-50 hover:text-foreground dark:hover:bg-accent dark:hover:text-accent-foreground',
                   )
                 }
               >

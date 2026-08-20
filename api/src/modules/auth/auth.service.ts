@@ -2,6 +2,7 @@ import { prisma } from '../../lib/prisma.js';
 import { comparePassword, hashPassword } from '../../utils/password.js';
 import { hashResetToken } from '../../utils/resetToken.js';
 import { issueSetPasswordEmail } from '../../utils/passwordInvite.js';
+import { sendEmail } from '../../utils/email.js';
 import { AppError } from '../../utils/errors.js';
 
 // Re-export so callers can import signToken from the service layer if needed,
@@ -158,4 +159,55 @@ export async function updateMe(
     data,
     select: AUTH_USER_SELECT,
   });
+}
+
+/**
+ * Self-service password change — a logged-in user changing their OWN
+ * password from the profile screen. Requires the current password so an
+ * unattended, unlocked session can't be used to lock the real owner out.
+ *
+ * Throws 401 if the current password doesn't match. Notifies the account by
+ * email afterward, same as the admin-driven `setUserPassword` flow.
+ */
+export async function changeMyPassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+
+  if (!user || !user.password_hash) {
+    throw new AppError(401, 'Senha atual incorreta');
+  }
+
+  const matches = await comparePassword(currentPassword, user.password_hash);
+  if (!matches) {
+    throw new AppError(401, 'Senha atual incorreta');
+  }
+
+  const password_hash = await hashPassword(newPassword);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      password_hash,
+      password_reset_token_hash: null,
+      password_reset_expires_at: null,
+    },
+  });
+
+  try {
+    await sendEmail({
+      to: user.email,
+      subject: 'Mundo Milhas — sua senha foi alterada',
+      html: `
+        <p>Olá, <strong>${user.name}</strong>!</p>
+        <p>Sua senha de acesso ao Mundo Milhas foi alterada.</p>
+        <p>Se você não reconhece esta ação, entre em contato com o suporte imediatamente.</p>
+        <p>Atenciosamente,<br/>Equipe Mundo Milhas</p>
+      `,
+    });
+  } catch (err) {
+    console.error('[auth.service] Falha ao enviar email de notificação de senha alterada:', err);
+  }
 }

@@ -26,6 +26,7 @@ function renderHeader(user: User | null) {
     login: vi.fn(),
     logout: vi.fn(),
     updateProfile: vi.fn(),
+    changePassword: vi.fn(),
   };
   return render(
     <ThemeContext.Provider value={mockTheme}>
@@ -38,32 +39,37 @@ function renderHeader(user: User | null) {
 
 describe('Property 11: Header exibe dados do usuário autenticado corretamente', () => {
   // Validates: Requirement 11.3
-  it('exibe nome e label "Admin" no menu do avatar para um usuário ADMIN', async () => {
+  it('exibe o nome permanentemente abaixo da foto e o papel "Admin" ao abrir o menu', async () => {
     const user = makeUser({ id: 'admin-id', name: 'Ana Administradora', role: 'ADMIN' });
     renderHeader(user);
 
+    // The name sits below the avatar at all times, no click required
+    expect(screen.getByText('Ana Administradora')).toBeInTheDocument();
+
     await userEvent.click(screen.getByRole('button', { name: 'Menu do usuário' }));
 
-    expect(await screen.findByText('Ana Administradora')).toBeInTheDocument();
-    expect(screen.getByText('Admin')).toBeInTheDocument();
+    expect(await screen.findByText('Admin')).toBeInTheDocument();
   });
 
-  it('exibe nome e label "Usuário" no menu do avatar para um usuário USER', async () => {
+  it('exibe o nome permanentemente abaixo da foto e o papel "Usuário" ao abrir o menu', async () => {
     const user = makeUser({ id: 'user-id', name: 'Um Usuário Comum', role: 'USER' });
     renderHeader(user);
 
+    expect(screen.getByText('Um Usuário Comum')).toBeInTheDocument();
+
     await userEvent.click(screen.getByRole('button', { name: 'Menu do usuário' }));
 
-    expect(await screen.findByText('Um Usuário Comum')).toBeInTheDocument();
-    expect(screen.getByText('Usuário')).toBeInTheDocument();
+    expect(await screen.findByText('Usuário')).toBeInTheDocument();
   });
 
-  it('a barra do header nunca mostra o nome/papel de forma permanente (só dentro do menu)', () => {
+  it('a barra do header mostra o nome permanentemente, mas o papel só aparece dentro do menu', () => {
     const user = makeUser({ id: 'test-id', name: 'Nome Visível De Longe', role: 'ADMIN' });
     const { container, unmount } = renderHeader(user);
 
-    // Before opening the menu, the name must not appear anywhere in the header bar
-    expect(container.textContent).not.toContain('Nome Visível De Longe');
+    // The name is always visible in the header bar, below the avatar
+    expect(container.textContent).toContain('Nome Visível De Longe');
+    // The role label stays hidden until the dropdown menu is opened
+    expect(container.textContent).not.toContain('Admin');
 
     unmount();
   });

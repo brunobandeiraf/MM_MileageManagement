@@ -44,13 +44,13 @@ describe('Property 14: Toggle de tema alterna corretamente e persiste', () => {
             </ThemeProvider>
           );
 
-          // Initial state: dark (default when localStorage is empty)
-          expect(capturedTheme).toBe('dark');
-          expect(localStorage.getItem('theme')).toBe('dark');
+          // Initial state: light (default when localStorage is empty)
+          expect(capturedTheme).toBe('light');
+          expect(localStorage.getItem('theme')).toBe('light');
 
           // Toggle n times and verify alternation + localStorage sync
           for (let i = 0; i < n; i++) {
-            const expectedTheme = i % 2 === 0 ? 'light' : 'dark';
+            const expectedTheme = i % 2 === 0 ? 'dark' : 'light';
             act(() => { capturedToggle?.(); });
             expect(capturedTheme).toBe(expectedTheme);
             expect(localStorage.getItem('theme')).toBe(expectedTheme);

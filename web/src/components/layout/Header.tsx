@@ -70,7 +70,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex max-w-[6.5rem] flex-col items-center gap-1 rounded-md px-1 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               aria-label="Menu do usuário"
             >
               <Avatar className="h-8 w-8">
@@ -79,11 +79,13 @@ export function Header({ onMenuToggle }: HeaderProps) {
                   {initial}
                 </AvatarFallback>
               </Avatar>
+              <span className="w-full truncate text-center text-xs font-medium leading-tight text-foreground">
+                {user.name}
+              </span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>
-              <p className="truncate text-sm font-medium text-foreground">{user.name}</p>
               <p className="text-xs font-normal text-muted-foreground">{roleLabel}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

@@ -73,8 +73,8 @@ export function SetPasswordPage() {
     <div className="flex min-h-screen w-full items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm rounded-xl border border-border bg-card shadow-xl">
         <div className="flex flex-col items-center gap-2 px-8 pt-8 pb-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10">
-            <Plane className="h-6 w-6 text-amber-500" aria-hidden="true" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600/10 dark:bg-amber-500/10">
+            <Plane className="h-6 w-6 text-blue-600 dark:text-amber-500" aria-hidden="true" />
           </div>
           <h1 className="text-xl font-semibold tracking-tight text-foreground">
             Mundo Milhas

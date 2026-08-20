@@ -40,10 +40,10 @@ export function DashboardPage() {
       {/* ── Cards de visão geral ── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* Card 1 — Bem-vindo à Mundo Milhas */}
-        <div className="rounded-xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
+        <div className="rounded-xl border border-border bg-card p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
           <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
-              <Globe className="h-5 w-5 text-amber-500" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600/10 dark:bg-amber-500/10">
+              <Globe className="h-5 w-5 text-blue-600 dark:text-amber-500" />
             </div>
             <h2 className="text-base font-semibold">Bem-vindo à Mundo Milhas</h2>
           </div>
@@ -54,10 +54,10 @@ export function DashboardPage() {
         </div>
 
         {/* Card 2 — Plataforma de Gestão */}
-        <div className="rounded-xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
+        <div className="rounded-xl border border-border bg-card p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
           <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
-              <TrendingUp className="h-5 w-5 text-amber-500" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600/10 dark:bg-amber-500/10">
+              <TrendingUp className="h-5 w-5 text-blue-600 dark:text-amber-500" />
             </div>
             <h2 className="text-base font-semibold">Plataforma de Gestão</h2>
           </div>
@@ -66,8 +66,8 @@ export function DashboardPage() {
             lugar, com visibilidade completa e relatórios em tempo real.
           </p>
           <div className="mt-4 flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-amber-500" />
-            <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+            <BarChart3 className="h-4 w-4 text-blue-600 dark:text-amber-500" />
+            <span className="text-xs font-medium text-blue-700 dark:text-amber-400">
               Relatórios em breve
             </span>
           </div>
@@ -77,11 +77,11 @@ export function DashboardPage() {
         {canManageUsers ? (
           <Link
             to="/usuarios"
-            className="group rounded-xl border border-amber-500/30 bg-card p-6 shadow-sm transition-all hover:border-amber-500/60 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="group rounded-xl border border-blue-600/30 bg-card p-6 shadow-sm transition-all hover:-translate-y-1 hover:border-blue-600/60 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:border-amber-500/30 dark:hover:border-amber-500/60"
           >
             <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10 transition-colors group-hover:bg-amber-500/20">
-                <Users className="h-5 w-5 text-amber-500" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600/10 transition-colors group-hover:bg-blue-600/20 dark:bg-amber-500/10 dark:group-hover:bg-amber-500/20">
+                <Users className="h-5 w-5 text-blue-600 dark:text-amber-500" />
               </div>
               <h2 className="text-base font-semibold">Gestão de Usuários</h2>
             </div>
@@ -90,16 +90,16 @@ export function DashboardPage() {
               e garanta o controle de acesso à plataforma.
             </p>
             <div className="mt-4">
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 underline-offset-2 group-hover:underline dark:text-amber-400">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 underline-offset-2 group-hover:underline dark:text-amber-400">
                 Acessar gestão →
               </span>
             </div>
           </Link>
         ) : (
-          <div className="rounded-xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
+          <div className="rounded-xl border border-border bg-card p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
             <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
-                <BarChart3 className="h-5 w-5 text-amber-500" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600/10 dark:bg-amber-500/10">
+                <BarChart3 className="h-5 w-5 text-blue-600 dark:text-amber-500" />
               </div>
               <h2 className="text-base font-semibold">Meus Relatórios</h2>
             </div>
@@ -108,7 +108,7 @@ export function DashboardPage() {
               acompanhe a evolução do seu saldo ao longo do tempo.
             </p>
             <div className="mt-4 flex items-center gap-2">
-              <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+              <span className="text-xs font-medium text-blue-700 dark:text-amber-400">
                 Em breve
               </span>
             </div>

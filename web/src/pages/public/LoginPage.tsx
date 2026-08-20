@@ -33,7 +33,7 @@ export function LoginPage() {
   if (isLoading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-amber-500" aria-label="Carregando" />
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-amber-500" aria-label="Carregando" />
       </div>
     )
   }
@@ -90,20 +90,12 @@ export function LoginPage() {
       <div className="w-full max-w-sm rounded-xl border border-border bg-card shadow-xl">
         {/* ── Card header ─────────────────────────────────── */}
         <div className="flex flex-col items-center gap-2 px-8 pt-8 pb-6">
-          {/* Plane icon in amber — links back to the home page */}
-          <Link
-            to="/"
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 transition-opacity hover:opacity-80"
-            aria-label="Voltar para a página inicial"
-          >
-            <Plane className="h-6 w-6 text-amber-500" aria-hidden="true" />
-          </Link>
-          <Link
-            to="/"
-            className="text-xl font-semibold tracking-tight text-foreground transition-opacity hover:opacity-80"
-          >
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600/10 dark:bg-amber-500/10">
+            <Plane className="h-6 w-6 text-blue-600 dark:text-amber-500" aria-hidden="true" />
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
             Mundo Milhas
-          </Link>
+          </h1>
           <p className="text-sm text-muted-foreground">
             Faça login para continuar
           </p>
@@ -216,7 +208,9 @@ export function LoginPage() {
         {/* ── Footer ──────────────────────────────────────── */}
         <div className="border-t border-border px-8 py-4">
           <p className="text-center text-xs text-muted-foreground">
-            Acesso restrito a usuários autorizados
+            <Link to="/" className="hover:text-foreground hover:underline">
+              Voltar para tela principal
+            </Link>
           </p>
         </div>
       </div>

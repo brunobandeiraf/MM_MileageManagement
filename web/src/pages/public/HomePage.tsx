@@ -90,6 +90,10 @@ const STATS = [
 const STATS_IMAGE = 'https://images.unsplash.com/photo-1554123168-b400f9c806ca?auto=format&fit=crop&w=900&q=80'
 const STATS_IMAGE_ALT = 'Viajante sentado observando a pista pela janela do aeroporto'
 
+// Placeholder do hero — no futuro este bloco será substituído por um vídeo do YouTube
+const HERO_IMAGE = 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=900&q=80'
+const HERO_IMAGE_ALT = 'Interior de cabine executiva de avião durante um voo'
+
 // Cada item de "Gestão Própria" é pareado (mesmo índice) com o contraponto
 // correspondente em "Gestão Mundo Milhas" — mantenha os dois arrays com o
 // mesmo tamanho ao editar.
@@ -167,7 +171,11 @@ const NEXT_STEPS = [
 const FAQ_ITEMS = [
   {
     question: 'Preciso já ter milhas acumuladas?',
-    answer: 'Não. A estratégia é montada a partir do seu padrão de gastos atual — o acúmulo começa a partir da análise de perfil.',
+    answer: 'Não. A estratégia é montada a partir do seu padrão de gastos atual — o acúmulo começa a partir da análise de perfil. E se você já tiver milhas, melhor ainda: potencializamos o que já existe, damos continuidade ao acúmulo para render ainda mais e executamos as estratégias de resgate com o que já está na sua conta.',
+  },
+  {
+    question: 'Isso não é muito complicado de entender?',
+    answer: 'Para você, não precisa ser. Temos um time de especialistas que cuida de toda a parte técnica — regras dos programas, timing de transferência, melhor momento de emissão — do início ao fim. Você só aproveita o resultado.',
   },
   {
     question: 'Vocês precisam de acesso à minha conta bancária ou cartão?',
@@ -175,11 +183,19 @@ const FAQ_ITEMS = [
   },
   {
     question: 'Qual o investimento na gestão?',
-    answer: 'Varia conforme o seu perfil e volume de gastos. Isso é definido na análise de perfil, sem compromisso.',
+    answer: 'Varia conforme o seu perfil e volume de gastos, e é definido na análise de perfil, sem compromisso. O retorno vem em duas frentes: o desconto financeiro real que você passa a ter em cada resgate, e o tempo que deixa de gastar pesquisando — nosso time pensa toda a estratégia por trás, e você só escolhe o destino.',
+  },
+  {
+    question: 'Existe fidelidade ou multa se eu quiser cancelar?',
+    answer: 'Nosso contrato é anual — é o tempo necessário para desenhar e executar a estratégia de acúmulo e resgate com consistência e gerar retorno de verdade. Você pode cancelar conforme as condições do contrato ou simplesmente optar por não renovar ao final do período. Na prática, porém, nenhum cliente cancelou ou deixou de renovar até hoje — pelo contrário, é comum que nos recomendem para amigos e familiares.',
+  },
+  {
+    question: 'Como sei que estou realmente economizando?',
+    answer: 'Toda emissão é registrada com clareza: valor em milhas, economia gerada e comparativo com o preço de balcão — é o nosso passo de Registro de Resultados, sempre visível para você. Além disso, trabalhamos com um sistema previsível de estimativa do valor acumulado e fazemos acompanhamento mensal, com a frequência que fizer sentido para o seu perfil.',
   },
   {
     question: 'E se eu não tiver viagens previstas no momento?',
-    answer: 'Sem problema — o acúmulo estratégico pode começar agora, e você decide quando usar as milhas.',
+    answer: 'Sem problema — o acúmulo estratégico pode começar agora, e você decide quando usar as milhas. E dependendo do contrato, os benefícios podem ser espelhados para familiares incluídos no acordo, então o acúmulo não fica parado esperando por você.',
   },
 ]
 
@@ -222,7 +238,7 @@ function SectionHeading({ eyebrow, title, description }: { eyebrow?: string; tit
   return (
     <motion.div variants={fadeUp} className="mb-12 text-center">
       {eyebrow && (
-        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-amber-500">{eyebrow}</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-blue-700 dark:text-amber-500">{eyebrow}</p>
       )}
       <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">{title}</h2>
       {description && <p className="mt-3 text-muted-foreground">{description}</p>}
@@ -258,7 +274,7 @@ function LoyaltyMarquee({ items }: { items: string[] }) {
         {[...items, ...items].map((item, i) => (
           <span
             key={`${item}-${i}`}
-            className="shrink-0 rounded-full border border-border/60 px-4 py-1.5 text-sm text-muted-foreground transition-colors hover:border-amber-500/40 hover:text-foreground"
+            className="shrink-0 rounded-full border border-border/60 px-4 py-1.5 text-sm text-muted-foreground transition-all hover:-translate-y-0.5 hover:border-blue-600/50 hover:bg-blue-600/5 hover:text-foreground hover:shadow-sm dark:hover:border-amber-500/50 dark:hover:bg-amber-500/5"
           >
             {item}
           </span>
@@ -303,12 +319,12 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-4 text-left"
+        className="group flex w-full items-center justify-between gap-4 text-left"
         aria-expanded={open}
       >
-        <span className="font-medium text-foreground">{question}</span>
+        <span className="font-medium text-foreground transition-colors group-hover:text-blue-700 dark:group-hover:text-amber-500">{question}</span>
         <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.25 }}>
-          <ChevronDown className="h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+          <ChevronDown className="h-4 w-4 shrink-0 text-blue-600 dark:text-amber-500" aria-hidden="true" />
         </motion.span>
       </button>
       <AnimatePresence initial={false}>
@@ -373,25 +389,28 @@ export function HomePage() {
       <header className="sticky top-0 z-40 border-b border-border/40 bg-background/80 px-6 py-4 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center">
           <Link to="/" className="flex items-center gap-3 shrink-0">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
-              <Plane className="h-5 w-5 text-amber-500" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600/10 dark:bg-amber-500/10">
+              <Plane className="h-5 w-5 text-blue-600 dark:text-amber-500" />
             </div>
-            <span className="text-lg font-semibold tracking-tight">Mundo Milhas</span>
+            <div>
+              <p className="text-lg font-semibold leading-tight tracking-tight">Mundo Milhas</p>
+              <p className="text-xs leading-tight text-muted-foreground">Gestão de Milhas</p>
+            </div>
           </Link>
 
           <div className="ml-auto flex items-center gap-8">
             <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
-              <a href="#como-funciona" className="transition-colors hover:text-foreground">Como Funciona</a>
-              <a href="#comparativo" className="transition-colors hover:text-foreground">Comparativo</a>
-              <a href="#resultados" className="transition-colors hover:text-foreground">Resultados</a>
-              <a href="#duvidas" className="transition-colors hover:text-foreground">Dúvidas</a>
+              <a href="#como-funciona" className="underline-offset-4 transition-colors hover:text-blue-700 hover:underline dark:hover:text-amber-500">Como Funciona</a>
+              <a href="#comparativo" className="underline-offset-4 transition-colors hover:text-blue-700 hover:underline dark:hover:text-amber-500">Comparativo</a>
+              <a href="#resultados" className="underline-offset-4 transition-colors hover:text-blue-700 hover:underline dark:hover:text-amber-500">Resultados</a>
+              <a href="#duvidas" className="underline-offset-4 transition-colors hover:text-blue-700 hover:underline dark:hover:text-amber-500">Dúvidas</a>
             </nav>
 
             <Button
               asChild
               variant="outline"
               size="sm"
-              className="border-amber-500/50 text-amber-500 hover:bg-amber-500/10 hover:text-amber-400 font-semibold"
+              className="border-blue-600/50 text-blue-700 hover:bg-blue-600/10 hover:text-blue-600 font-semibold dark:border-amber-500/50 dark:text-amber-500 dark:hover:bg-amber-500/10 dark:hover:text-amber-400"
             >
               <Link to="/login">Entrar</Link>
             </Button>
@@ -401,16 +420,16 @@ export function HomePage() {
 
       <main>
         {/* ── Hero ────────────────────────────────────────────── */}
-        <section className="relative overflow-hidden px-6 py-24 sm:py-32">
+        <section className="relative overflow-hidden px-6 pt-6 pb-8 sm:pt-8 sm:pb-10">
           {/* Decorative animated glow */}
           <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
             <motion.div
-              className="absolute -top-40 left-1/4 h-[28rem] w-[28rem] rounded-full bg-amber-500/20 blur-[120px]"
+              className="absolute -top-40 left-1/4 h-[28rem] w-[28rem] rounded-full bg-blue-600/20 blur-[120px] dark:bg-amber-500/20"
               animate={prefersReducedMotion ? undefined : { x: [0, 50, 0], y: [0, 30, 0] }}
               transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }}
             />
             <motion.div
-              className="absolute top-32 right-1/4 h-80 w-80 rounded-full bg-amber-400/10 blur-[120px]"
+              className="absolute top-32 right-1/4 h-80 w-80 rounded-full bg-blue-500/10 blur-[120px] dark:bg-amber-400/10"
               animate={prefersReducedMotion ? undefined : { x: [0, -40, 0], y: [0, -25, 0] }}
               transition={{ duration: 24, repeat: Infinity, ease: 'easeInOut' }}
             />
@@ -424,41 +443,73 @@ export function HomePage() {
           </div>
 
           <motion.div
-            className="mx-auto flex max-w-3xl flex-col items-center text-center"
+            className="mx-auto max-w-6xl"
             initial="hidden"
             animate="visible"
             variants={staggerContainer}
           >
-            <motion.div
-              variants={fadeUp}
-              className="mb-6 inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-amber-500"
-            >
-              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-              Para quem gasta acima de R$ 15 mil/mês no cartão
-            </motion.div>
+            <div className="grid gap-10 lg:grid-cols-2 lg:items-stretch">
+              <motion.div
+                variants={staggerContainer}
+                className="flex flex-col items-center text-center lg:items-start lg:text-left"
+              >
+                <motion.div
+                  variants={fadeUp}
+                  className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-600/30 bg-blue-600/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-blue-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-500"
+                >
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                  Para quem gasta acima de R$ 15 mil/mês no cartão
+                </motion.div>
 
-            <motion.h1 variants={fadeUp} className="text-4xl font-bold leading-[1.1] tracking-tight sm:text-6xl">
-              Acúmulo de milhas não é sorte.{' '}
-              <span className="bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
-                É método!
-              </span>{' '}
-              E o método{' '}
-              <span className="bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
-                é nosso
-              </span>{' '}
-              para fazer suas milhas trabalharem a seu favor.
-            </motion.h1>
+                <motion.h1 variants={fadeUp} className="text-4xl font-bold leading-[1.1] tracking-tight sm:text-6xl">
+                  Acúmulo de milhas não é sorte.{' '}
+                  <span className="bg-gradient-to-r from-blue-500 to-blue-700 bg-clip-text text-transparent dark:from-amber-400 dark:to-amber-600">
+                    É método!
+                  </span>{' '}
+                  E o método{' '}
+                  <span className="bg-gradient-to-r from-blue-500 to-blue-700 bg-clip-text text-transparent dark:from-amber-400 dark:to-amber-600">
+                    é nosso
+                  </span>{' '}
+                  para fazer suas milhas trabalharem a seu favor.
+                </motion.h1>
 
-            <motion.p variants={fadeUp} className="mt-6 max-w-xl text-lg text-muted-foreground">
-              Você não precisa entender de milhas, pontos ou programas de fidelidade. Nós cuidamos de
-              cada etapa — da estratégia à emissão — e transformamos sua fatura em passagens premium.
-            </motion.p>
+                <motion.p variants={fadeUp} className="mt-6 max-w-xl text-lg text-muted-foreground">
+                  Você não precisa entender de milhas, pontos ou programas de fidelidade. Nós cuidamos de
+                  cada etapa — da estratégia à emissão — e transformamos sua fatura em passagens premium.
+                </motion.p>
+              </motion.div>
 
-            <motion.div variants={fadeUp} className="mt-10 flex flex-col items-center gap-4 sm:flex-row">
+              {/* Imagem — placeholder para o futuro vídeo explicativo do YouTube */}
+              <motion.div
+                variants={fadeUp}
+                whileHover={{ scale: 1.02 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                className="group relative min-h-[240px]"
+              >
+                <a
+                  href="#como-funciona"
+                  aria-label="Ver como funciona"
+                  className="relative block h-full overflow-hidden rounded-2xl border border-border/60 shadow-xl"
+                >
+                  <img
+                    src={HERO_IMAGE}
+                    alt={HERO_IMAGE_ALT}
+                    loading="eager"
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-5">
+                    <p className="text-sm font-medium text-white">Ver como funciona</p>
+                  </div>
+                </a>
+              </motion.div>
+            </div>
+
+            {/* Botões — centralizados abaixo do título/imagem */}
+            <motion.div variants={fadeUp} className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button
                 asChild
                 size="lg"
-                className="group bg-amber-500 text-black hover:bg-amber-400 font-semibold px-8"
+                className="group bg-blue-600 text-white hover:bg-blue-500 font-semibold px-8 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400"
               >
                 <a href="#analise-de-perfil">
                   Quero Minha Análise de Perfil
@@ -476,11 +527,11 @@ export function HomePage() {
             {/* Trust markers */}
             <motion.div
               variants={fadeUp}
-              className="mt-14 grid w-full gap-4 border-t border-border/40 pt-10 sm:grid-cols-3"
+              className="mt-7 grid gap-4 border-t border-border/40 pt-5 sm:grid-cols-3"
             >
               {TRUST_MARKERS.map(({ icon: Icon, text }) => (
                 <div key={text} className="flex items-start gap-2.5 text-left">
-                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-amber-500" aria-hidden="true" />
                   <span className="text-sm text-muted-foreground">{text}</span>
                 </div>
               ))}
@@ -499,7 +550,7 @@ export function HomePage() {
         </section>
 
         {/* ── Números ─────────────────────────────────────────── */}
-        <section className="border-t border-border/40 px-6 py-24">
+        <section className="border-t border-border/40 px-6 py-8">
           <Reveal className="mx-auto grid max-w-5xl items-center gap-10 lg:grid-cols-2">
             <motion.div variants={fadeUp} className="overflow-hidden rounded-xl">
               <img
@@ -512,7 +563,7 @@ export function HomePage() {
             <div className="divide-y divide-border/60">
               {STATS.map((stat) => (
                 <motion.div key={stat.label} variants={fadeUp} className="py-6 first:pt-0 last:pb-0">
-                  <p className="text-4xl font-bold tracking-tight text-amber-500 sm:text-5xl">
+                  <p className="text-4xl font-bold tracking-tight text-blue-600 sm:text-5xl dark:text-amber-500">
                     <StatCounter value={stat.value} prefix={stat.prefix} suffix={stat.suffix} />
                   </p>
                   <p className="mt-2 text-sm text-muted-foreground">{stat.label}</p>
@@ -523,7 +574,7 @@ export function HomePage() {
         </section>
 
         {/* ── Como Funciona ───────────────────────────────────── */}
-        <section id="como-funciona" className="scroll-mt-16 px-6 py-24">
+        <section id="como-funciona" className="scroll-mt-16 px-6 py-8">
           <Reveal className="mx-auto max-w-6xl">
             <SectionHeading
               title="Como Funciona a Gestão"
@@ -532,14 +583,14 @@ export function HomePage() {
 
             {/* Animated flight path connector (desktop only) */}
             <div className="relative mx-auto mb-2 hidden h-6 max-w-5xl lg:block">
-              <div className="absolute left-[10%] right-[10%] top-1/2 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
+              <div className="absolute left-[10%] right-[10%] top-1/2 h-px bg-gradient-to-r from-transparent via-blue-600/40 to-transparent dark:via-amber-500/40" />
               {!prefersReducedMotion && (
                 <motion.div
                   className="absolute top-1/2 -translate-y-1/2"
                   animate={{ left: ['8%', '92%', '8%'] }}
                   transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
                 >
-                  <Plane className="h-4 w-4 rotate-90 text-amber-500" aria-hidden="true" />
+                  <Plane className="h-4 w-4 rotate-90 text-blue-600 dark:text-amber-500" aria-hidden="true" />
                 </motion.div>
               )}
             </div>
@@ -549,13 +600,13 @@ export function HomePage() {
                 <motion.div
                   key={step}
                   variants={fadeUp}
-                  whileHover={{ y: -6 }}
+                  whileHover={{ y: -8, scale: 1.02 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                  className="rounded-xl border border-border/60 bg-card p-6"
+                  className="rounded-xl border border-border/60 bg-blue-50/50 p-6 shadow-sm transition-shadow hover:border-blue-600/50 hover:shadow-xl dark:bg-card dark:hover:border-amber-500/50"
                 >
                   <div className="mb-4 flex items-center gap-3">
-                    <span className="text-2xl font-bold text-amber-500/40">{step}</span>
-                    <Icon className="h-5 w-5 text-amber-500" aria-hidden="true" />
+                    <span className="text-2xl font-bold text-blue-600/40 dark:text-amber-500/40">{step}</span>
+                    <Icon className="h-5 w-5 text-blue-600 dark:text-amber-500" aria-hidden="true" />
                   </div>
                   <h3 className="mb-2 text-base font-semibold">{title}</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
@@ -563,7 +614,7 @@ export function HomePage() {
               ))}
             </div>
             <motion.div variants={fadeUp} className="mt-10 text-center">
-              <Button asChild className="bg-amber-500 text-black hover:bg-amber-400 font-semibold">
+              <Button asChild className="bg-blue-600 text-white hover:bg-blue-500 font-semibold dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400">
                 <a href="#analise-de-perfil">Solicitar Análise de Perfil</a>
               </Button>
             </motion.div>
@@ -571,7 +622,7 @@ export function HomePage() {
         </section>
 
         {/* ── Comparativo ─────────────────────────────────────── */}
-        <section id="comparativo" className="scroll-mt-16 border-t border-border/40 bg-muted/20 px-6 py-24">
+        <section id="comparativo" className="scroll-mt-16 border-t border-border/40 bg-blue-50/70 px-6 py-8 dark:bg-muted/20">
           <Reveal className="mx-auto max-w-5xl">
             <SectionHeading
               title="Gestão própria vs. Gestão Mundo Milhas"
@@ -580,22 +631,22 @@ export function HomePage() {
             <motion.div variants={fadeUp} className="overflow-hidden rounded-xl border border-border/60">
               {/* Header row */}
               <div className="grid grid-cols-1 sm:grid-cols-2">
-                <div className="border-b border-border/60 bg-background px-5 py-4 text-sm font-semibold text-muted-foreground">
+                <div className="border-b border-border/60 bg-background px-5 py-4 text-base font-semibold text-muted-foreground">
                   Gestão Própria
                 </div>
-                <div className="border-b border-t border-border/60 bg-amber-500/5 px-5 py-4 text-sm font-semibold text-amber-500 sm:border-t-0">
+                <div className="border-b border-t border-border/60 bg-blue-600/15 px-5 py-4 text-base font-semibold text-blue-700 sm:border-t-0 dark:bg-amber-500/5 dark:text-amber-500">
                   Gestão Mundo Milhas
                 </div>
               </div>
               {/* Paired rows — each Gestão Própria item lines up with its counterpoint */}
               {SELF_MANAGED_CONS.map((item, i) => (
                 <div key={item} className="grid grid-cols-1 sm:grid-cols-2">
-                  <div className="flex items-start gap-2 border-b border-border/60 bg-background px-5 py-4 text-sm text-muted-foreground">
+                  <div className="flex items-start gap-2 border-b border-border/60 bg-background px-5 py-4 text-base text-muted-foreground">
                     <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive/70" aria-hidden="true" />
                     {item}
                   </div>
-                  <div className="flex items-start gap-2 border-b border-t border-border/60 bg-amber-500/5 px-5 py-4 text-sm text-foreground sm:border-t-0">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+                  <div className="flex items-start gap-2 border-b border-t border-border/60 bg-blue-600/15 px-5 py-4 text-base text-foreground sm:border-t-0 dark:bg-amber-500/5">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-amber-500" aria-hidden="true" />
                     {MANAGED_PROS[i]}
                   </div>
                 </div>
@@ -605,7 +656,7 @@ export function HomePage() {
         </section>
 
         {/* ── O que está incluso ──────────────────────────────── */}
-        <section className="px-6 py-24">
+        <section className="px-6 py-8">
           <Reveal className="mx-auto max-w-6xl">
             <SectionHeading
               title="O que está incluso na gestão"
@@ -616,12 +667,12 @@ export function HomePage() {
                 <motion.div
                   key={title}
                   variants={fadeUp}
-                  whileHover={{ y: -6 }}
+                  whileHover={{ y: -8, scale: 1.02 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                  className="rounded-xl border border-border/60 bg-card p-6"
+                  className="rounded-xl border border-border/60 bg-blue-50/50 p-6 shadow-sm transition-shadow hover:border-blue-600/50 hover:shadow-xl dark:bg-card dark:hover:border-amber-500/50"
                 >
-                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-amber-500/10">
-                    <Icon className="h-5 w-5 text-amber-500" />
+                  <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-blue-600/10 dark:bg-amber-500/10">
+                    <Icon className="h-5 w-5 text-blue-600 dark:text-amber-500" />
                   </div>
                   <h3 className="mb-2 text-base font-semibold">{title}</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
@@ -632,7 +683,7 @@ export function HomePage() {
         </section>
 
         {/* ── Resultados ──────────────────────────────────────── */}
-        <section id="resultados" className="scroll-mt-16 border-t border-border/40 bg-muted/20 px-6 py-24">
+        <section id="resultados" className="scroll-mt-16 border-t border-border/40 bg-blue-50/70 px-6 py-8 dark:bg-muted/20">
           <Reveal className="mx-auto max-w-6xl">
             <SectionHeading
               title="O que é possível com a gestão dedicada"
@@ -643,9 +694,9 @@ export function HomePage() {
                 <motion.div
                   key={title}
                   variants={fadeUp}
-                  whileHover={{ y: -6, scale: 1.01 }}
+                  whileHover={{ y: -8, scale: 1.03 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                  className="overflow-hidden rounded-xl border border-border/60 bg-background"
+                  className="overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm transition-shadow hover:border-blue-600/50 hover:shadow-xl dark:hover:border-amber-500/50"
                 >
                   <div className="relative aspect-[8/3]">
                     <img
@@ -656,7 +707,7 @@ export function HomePage() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/0 to-black/0" />
                     <div className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg bg-black/40 backdrop-blur-sm">
-                      <Icon className="h-4 w-4 text-amber-400" aria-hidden="true" />
+                      <Icon className="h-4 w-4 text-blue-500 dark:text-amber-400" aria-hidden="true" />
                     </div>
                   </div>
                   <div className="p-6">
@@ -670,10 +721,10 @@ export function HomePage() {
         </section>
 
         {/* ── Lead form ───────────────────────────────────────── */}
-        <section id="analise-de-perfil" className="scroll-mt-16 px-6 py-24">
+        <section id="analise-de-perfil" className="scroll-mt-16 px-6 py-8">
           <div className="mx-auto grid max-w-5xl gap-12 lg:grid-cols-2 lg:items-center">
             <Reveal>
-              <motion.p variants={fadeUp} className="mb-2 text-xs font-semibold uppercase tracking-widest text-amber-500">
+              <motion.p variants={fadeUp} className="mb-2 text-xs font-semibold uppercase tracking-widest text-blue-700 dark:text-amber-500">
                 Vagas limitadas por mês
               </motion.p>
               <motion.h2 variants={fadeUp} className="text-3xl font-bold tracking-tight sm:text-4xl">
@@ -687,7 +738,7 @@ export function HomePage() {
               <motion.div variants={fadeUp} className="mt-10 space-y-5">
                 {NEXT_STEPS.map((item, i) => (
                   <div key={item.title} className="flex items-start gap-4">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-amber-500/40 text-sm font-semibold text-amber-500">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-blue-600/40 text-sm font-semibold text-blue-700 dark:border-amber-500/40 dark:text-amber-500">
                       {i + 1}
                     </div>
                     <div>
@@ -713,7 +764,7 @@ export function HomePage() {
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ type: 'spring', stiffness: 260, damping: 18 }}
                   >
-                    <ShieldCheck className="mx-auto mb-4 h-10 w-10 text-amber-500" aria-hidden="true" />
+                    <ShieldCheck className="mx-auto mb-4 h-10 w-10 text-blue-600 dark:text-amber-500" aria-hidden="true" />
                   </motion.div>
                   <p className="text-lg font-semibold">Recebemos sua solicitação!</p>
                   <p className="mt-2 text-sm text-muted-foreground">
@@ -792,7 +843,7 @@ export function HomePage() {
 
                   <Button
                     type="submit"
-                    className="w-full bg-amber-500 text-black hover:bg-amber-400 font-semibold"
+                    className="w-full bg-blue-600 text-white hover:bg-blue-500 font-semibold dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400"
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? (
@@ -815,7 +866,7 @@ export function HomePage() {
         </section>
 
         {/* ── FAQ ─────────────────────────────────────────────── */}
-        <section id="duvidas" className="scroll-mt-16 border-t border-border/40 bg-muted/20 px-6 py-24">
+        <section id="duvidas" className="scroll-mt-16 border-t border-border/40 bg-blue-50/70 px-6 py-8 dark:bg-muted/20">
           <Reveal className="mx-auto max-w-2xl">
             <SectionHeading title="Perguntas Frequentes" />
             <div>
@@ -828,12 +879,12 @@ export function HomePage() {
       </main>
 
       {/* ── Footer ──────────────────────────────────────────── */}
-      <footer className="border-t border-border/40 px-6 py-10">
+      <footer className="border-t border-border/40 px-6 pt-10 pb-4">
         <div className="mx-auto max-w-6xl">
           <div className="grid gap-8 sm:grid-cols-3">
             <div>
               <div className="mb-3 flex items-center gap-2">
-                <Plane className="h-4 w-4 text-amber-500" />
+                <Plane className="h-4 w-4 text-blue-600 dark:text-amber-500" />
                 <span className="font-semibold">Mundo Milhas</span>
               </div>
               <p className="text-sm text-muted-foreground">
@@ -843,10 +894,10 @@ export function HomePage() {
             <div>
               <p className="mb-3 text-sm font-semibold">Links Rápidos</p>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#como-funciona" className="hover:text-foreground">Como Funciona</a></li>
-                <li><a href="#comparativo" className="hover:text-foreground">Comparativo</a></li>
-                <li><a href="#analise-de-perfil" className="hover:text-foreground">Solicitar Análise</a></li>
-                <li><Link to="/login" className="hover:text-foreground">Entrar</Link></li>
+                <li><a href="#como-funciona" className="underline-offset-4 transition-colors hover:text-blue-700 hover:underline dark:hover:text-amber-500">Como Funciona</a></li>
+                <li><a href="#comparativo" className="underline-offset-4 transition-colors hover:text-blue-700 hover:underline dark:hover:text-amber-500">Comparativo</a></li>
+                <li><a href="#analise-de-perfil" className="underline-offset-4 transition-colors hover:text-blue-700 hover:underline dark:hover:text-amber-500">Solicitar Análise</a></li>
+                <li><Link to="/login" className="underline-offset-4 transition-colors hover:text-blue-700 hover:underline dark:hover:text-amber-500">Entrar</Link></li>
               </ul>
             </div>
             <div>
@@ -854,20 +905,20 @@ export function HomePage() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {contact?.email && (
                   <li className="flex items-center gap-2">
-                    <MessageCircle className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" />
+                    <MessageCircle className="h-3.5 w-3.5 text-blue-600 dark:text-amber-500" aria-hidden="true" />
                     {contact.email}
                   </li>
                 )}
                 {contact?.phone && (
                   <li className="flex items-center gap-2">
-                    <Headset className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" />
+                    <Headset className="h-3.5 w-3.5 text-blue-600 dark:text-amber-500" aria-hidden="true" />
                     {contact.phone}
                   </li>
                 )}
               </ul>
             </div>
           </div>
-          <div className="mt-10 border-t border-border/40 pt-6 text-center text-xs text-muted-foreground">
+          <div className="mt-2 border-t border-border/40 pt-1 text-center text-xs text-muted-foreground">
             © {new Date().getFullYear()} Mundo Milhas. Todos os direitos reservados.
           </div>
         </div>

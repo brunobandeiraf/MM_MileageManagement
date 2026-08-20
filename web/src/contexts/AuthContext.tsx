@@ -25,6 +25,7 @@ export type AuthContextValue = {
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   updateProfile: (data: ProfileUpdate) => Promise<void>
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue>({
@@ -33,6 +34,7 @@ export const AuthContext = createContext<AuthContextValue>({
   login: async () => {},
   logout: async () => {},
   updateProfile: async () => {},
+  changePassword: async () => {},
 })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -67,8 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(user)
   }
 
+  async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await apiPut('/auth/me/password', { currentPassword, newPassword })
+  }
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, updateProfile, changePassword }}>
       {children}
     </AuthContext.Provider>
   )

@@ -22,4 +22,7 @@ router.get('/me', authMiddleware, authController.me);
 // PUT /me — requires authentication, self-service profile update
 router.put('/me', authMiddleware, authController.updateMe);
 
+// PUT /me/password — requires authentication, self-service password change
+router.put('/me/password', authMiddleware, authController.changePassword);
+
 export default router;

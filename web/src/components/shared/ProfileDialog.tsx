@@ -27,7 +27,7 @@ interface ProfileDialogProps {
  * avatar menu.
  */
 export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
-  const { user, updateProfile } = useAuth()
+  const { user, updateProfile, changePassword } = useAuth()
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   const [name, setName] = React.useState('')
@@ -37,6 +37,13 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const [error, setError] = React.useState<string | null>(null)
   const [isSaving, setIsSaving] = React.useState(false)
 
+  const [currentPassword, setCurrentPassword] = React.useState('')
+  const [newPassword, setNewPassword] = React.useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = React.useState('')
+  const [passwordError, setPasswordError] = React.useState<string | null>(null)
+  const [passwordSuccess, setPasswordSuccess] = React.useState(false)
+  const [isChangingPassword, setIsChangingPassword] = React.useState(false)
+
   React.useEffect(() => {
     if (open && user) {
       setName(user.name)
@@ -44,6 +51,11 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
       setPhone(user.phone)
       setAvatarUrl(user.avatar_url)
       setError(null)
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmNewPassword('')
+      setPasswordError(null)
+      setPasswordSuccess(false)
     }
   }, [open, user])
 
@@ -78,6 +90,34 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
       setError(err instanceof Error ? err.message : 'Erro ao atualizar perfil.')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  async function handlePasswordSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setPasswordError(null)
+    setPasswordSuccess(false)
+
+    if (newPassword.length < 8) {
+      setPasswordError('A nova senha deve ter pelo menos 8 caracteres.')
+      return
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError('A confirmação não corresponde à nova senha.')
+      return
+    }
+
+    setIsChangingPassword(true)
+    try {
+      await changePassword(currentPassword, newPassword)
+      setPasswordSuccess(true)
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmNewPassword('')
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Erro ao alterar senha.')
+    } finally {
+      setIsChangingPassword(false)
     }
   }
 
@@ -169,6 +209,65 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
             </Button>
           </DialogFooter>
         </form>
+
+        <div className="border-t border-border pt-4">
+          <h3 className="text-sm font-semibold text-foreground">Alterar Senha</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Informe sua senha atual e a nova senha desejada.
+          </p>
+
+          <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="current-password">Senha Atual</Label>
+              <Input
+                id="current-password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                disabled={isChangingPassword}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Nova Senha</Label>
+              <Input
+                id="new-password"
+                type="password"
+                autoComplete="new-password"
+                required
+                minLength={8}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                disabled={isChangingPassword}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-new-password">Confirmar Nova Senha</Label>
+              <Input
+                id="confirm-new-password"
+                type="password"
+                autoComplete="new-password"
+                required
+                minLength={8}
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                disabled={isChangingPassword}
+              />
+            </div>
+
+            {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
+            {passwordSuccess && (
+              <p className="text-sm text-emerald-600 dark:text-emerald-400">Senha alterada com sucesso.</p>
+            )}
+
+            <div className="flex justify-end">
+              <Button type="submit" variant="outline" disabled={isChangingPassword}>
+                {isChangingPassword ? 'Alterando…' : 'Alterar Senha'}
+              </Button>
+            </div>
+          </form>
+        </div>
       </DialogContent>
     </Dialog>
   )
