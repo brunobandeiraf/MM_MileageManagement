@@ -10,8 +10,13 @@ vi.mock('../../src/lib/prisma.js', () => ({
   prisma: {
     user: {
       findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
       update: vi.fn(),
-    }
+    },
+    bank: {
+      findMany: vi.fn(),
+    },
+    $transaction: vi.fn(),
   }
 }));
 
@@ -27,7 +32,8 @@ vi.mock('../../src/config/env.js', () => ({
   }
 }));
 
-import { login, setPassword, forgotPassword, updateMe } from '../../src/modules/auth/auth.service.js';
+import bcrypt from 'bcryptjs';
+import { login, setPassword, forgotPassword, updateMe, updateMyBanks } from '../../src/modules/auth/auth.service.js';
 import { prisma } from '../../src/lib/prisma.js';
 import { hashResetToken } from '../../src/utils/resetToken.js';
 import { AppError } from '../../src/utils/errors.js';
@@ -103,6 +109,107 @@ describe('Property 24: login com senha ainda não definida retorna null', () => 
       ),
       { numRuns: 20 }
     );
+  });
+});
+
+describe('Property 29: login bem-sucedido inclui os bancos vinculados ao usuário', () => {
+  it('retorna o usuário com a lista de bancos achatada a partir da relação UserBank', async () => {
+    const password = 'correct-horse-battery-staple';
+    const password_hash = await bcrypt.hash(password, 10);
+
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'test-id',
+      name: 'Test User',
+      email: 'test@test.com',
+      password_hash,
+      role: 'USER' as const,
+      created_at: new Date(),
+      updated_at: new Date(),
+    } as any);
+
+    vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
+      id: 'test-id',
+      name: 'Test User',
+      email: 'test@test.com',
+      phone: '(11) 91234-5678',
+      avatar_url: null,
+      role: 'USER' as const,
+      banks: [
+        { bank: { id: 'bank-1', name: 'Banco do Brasil' } },
+        { bank: { id: 'bank-2', name: 'Bradesco' } },
+      ],
+    } as any);
+
+    const result = await login('test@test.com', password);
+
+    expect(result).not.toBeNull();
+    expect(result?.banks).toEqual([
+      { id: 'bank-1', name: 'Banco do Brasil' },
+      { id: 'bank-2', name: 'Bradesco' },
+    ]);
+  });
+});
+
+describe('Property 30: updateMyBanks — autoatribuição de bancos', () => {
+  const mockTx = {
+    userBank: { deleteMany: vi.fn(), createMany: vi.fn() },
+    user: { findUniqueOrThrow: vi.fn() },
+  };
+
+  beforeEach(() => {
+    vi.mocked(prisma.bank.findMany).mockReset();
+    vi.mocked(prisma.$transaction).mockReset();
+    mockTx.userBank.deleteMany.mockReset();
+    mockTx.userBank.createMany.mockReset();
+    mockTx.user.findUniqueOrThrow.mockReset();
+    vi.mocked(prisma.$transaction).mockImplementation(((cb: any) => cb(mockTx)) as any);
+  });
+
+  it('lança 400 quando algum bankId não existe no catálogo', async () => {
+    vi.mocked(prisma.bank.findMany).mockResolvedValue([{ id: 'real-bank' }] as any);
+
+    await expect(updateMyBanks('user-1', ['real-bank', 'fake-bank'])).rejects.toSatisfy(
+      (err: unknown) => err instanceof AppError && err.statusCode === 400
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('substitui o conjunto de bancos do próprio usuário dentro de uma transação', async () => {
+    vi.mocked(prisma.bank.findMany).mockResolvedValue([{ id: 'bank-a' }] as any);
+    mockTx.user.findUniqueOrThrow.mockResolvedValue({
+      id: 'user-1',
+      name: 'Test User',
+      email: 'test@test.com',
+      phone: '(11) 91234-5678',
+      avatar_url: null,
+      role: 'USER',
+      banks: [{ bank: { id: 'bank-a', name: 'Banco A' } }],
+    });
+
+    const result = await updateMyBanks('user-1', ['bank-a']);
+
+    expect(mockTx.userBank.deleteMany).toHaveBeenCalledWith({ where: { user_id: 'user-1' } });
+    expect(mockTx.userBank.createMany).toHaveBeenCalledWith({
+      data: [{ user_id: 'user-1', bank_id: 'bank-a' }],
+    });
+    expect(result.banks).toEqual([{ id: 'bank-a', name: 'Banco A' }]);
+  });
+
+  it('lista vazia apenas desvincula, sem chamar createMany', async () => {
+    mockTx.user.findUniqueOrThrow.mockResolvedValue({
+      id: 'user-1',
+      name: 'Test User',
+      email: 'test@test.com',
+      phone: '(11) 91234-5678',
+      avatar_url: null,
+      role: 'USER',
+      banks: [],
+    });
+
+    await updateMyBanks('user-1', []);
+
+    expect(mockTx.userBank.deleteMany).toHaveBeenCalledWith({ where: { user_id: 'user-1' } });
+    expect(mockTx.userBank.createMany).not.toHaveBeenCalled();
   });
 });
 
@@ -234,6 +341,7 @@ describe('Property 28: updateMe — edição do próprio perfil', () => {
       phone: '(11) 91234-5678',
       avatar_url: null,
       role: 'USER',
+      banks: [],
     } as any);
 
     const result = await updateMe('test-id', { email: 'mine@test.com', name: 'Meu Nome' });

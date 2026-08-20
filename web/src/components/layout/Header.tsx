@@ -9,7 +9,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
 } from '../ui/dropdown-menu'
 import { ProfileDialog } from '../shared/ProfileDialog'
@@ -70,25 +69,26 @@ export function Header({ onMenuToggle }: HeaderProps) {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="flex max-w-[6.5rem] flex-col items-center gap-1 rounded-md px-1 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex items-center gap-2.5 rounded-md px-1.5 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               aria-label="Menu do usuário"
             >
-              <Avatar className="h-8 w-8">
+              <span className="flex max-w-[9rem] flex-col items-end text-right">
+                <span className="w-full truncate text-sm font-medium leading-tight text-foreground">
+                  {user.name}
+                </span>
+                <span className="w-full truncate text-xs leading-tight text-muted-foreground">
+                  {roleLabel}
+                </span>
+              </span>
+              <Avatar className="h-11 w-11 shrink-0">
                 <AvatarImage src={user.avatar_url ?? undefined} alt={user.name} />
-                <AvatarFallback className="text-xs font-semibold text-primary">
+                <AvatarFallback className="text-sm font-semibold text-primary">
                   {initial}
                 </AvatarFallback>
               </Avatar>
-              <span className="w-full truncate text-center text-xs font-medium leading-tight text-foreground">
-                {user.name}
-              </span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>
-              <p className="text-xs font-normal text-muted-foreground">{roleLabel}</p>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => setProfileOpen(true)}>
               <UserRound className="mr-2 h-4 w-4" aria-hidden="true" />
               Meu Perfil

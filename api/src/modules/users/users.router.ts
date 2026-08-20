@@ -16,5 +16,6 @@ router.post('/', usersController.createUser);
 router.put('/:id', usersController.updateUser);
 router.delete('/:id', usersController.deleteUser);
 router.put('/:id/password', usersController.setPassword);
+router.put('/:id/banks', usersController.setUserBanks);
 
 export default router;

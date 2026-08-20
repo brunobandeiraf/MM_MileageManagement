@@ -16,6 +16,8 @@ import {
   DialogDescription,
 } from '../../components/ui/dialog'
 import { useToast } from '../../components/ui/use-toast'
+import { BankMultiSelect } from '../../components/shared/BankMultiSelect'
+import { SortableTh, type SortOrder } from '../../components/shared/SortableTh'
 
 const PAGE_SIZE = 20
 const SEARCH_DEBOUNCE_MS = 400
@@ -27,6 +29,11 @@ type CreatableRole = 'ADMIN' | 'FUNCIONARIO' | 'USER'
 /**
  * User type as returned by the API.
  */
+interface BankRef {
+  id: string
+  name: string
+}
+
 interface User {
   id: string
   name: string
@@ -34,6 +41,7 @@ interface User {
   phone: string
   role: Role
   created_at: string
+  banks: BankRef[]
 }
 
 interface UsersApiResponse {
@@ -87,6 +95,20 @@ export function UsersPage() {
   const [searchInput, setSearchInput] = React.useState('')
   const [search, setSearch] = React.useState('')
 
+  // Sort state
+  const [sortBy, setSortBy] = React.useState('created_at')
+  const [sortOrder, setSortOrder] = React.useState<SortOrder>('asc')
+
+  const handleSort = (column: string) => {
+    setPage(1)
+    if (sortBy === column) {
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortBy(column)
+      setSortOrder('asc')
+    }
+  }
+
   // Create dialog state
   const [createOpen, setCreateOpen] = React.useState(false)
   const [createName, setCreateName] = React.useState('')
@@ -104,8 +126,12 @@ export function UsersPage() {
   const [editPassword, setEditPassword] = React.useState('')
   const [editConfirmPassword, setEditConfirmPassword] = React.useState('')
   const [showEditPassword, setShowEditPassword] = React.useState(false)
+  const [editBankIds, setEditBankIds] = React.useState<Set<string>>(new Set())
   const [editError, setEditError] = React.useState<string | null>(null)
   const [isEditing, setIsEditing] = React.useState(false)
+
+  // Bank catalog — used to populate the "Bancos" multi-select in the edit dialog
+  const [banks, setBanks] = React.useState<BankRef[]>([])
 
   // Delete dialog state
   const [deleteUser, setDeleteUser] = React.useState<User | null>(null)
@@ -128,7 +154,12 @@ export function UsersPage() {
     setIsLoading(true)
     setFetchError(null)
     try {
-      const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) })
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(PAGE_SIZE),
+        sortBy,
+        sortOrder,
+      })
       if (search) params.set('search', search)
       const res = await apiGet<UsersApiResponse>(`/users?${params.toString()}`)
       setUsers(res.data)
@@ -138,11 +169,17 @@ export function UsersPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [page, search])
+  }, [page, search, sortBy, sortOrder])
 
   React.useEffect(() => {
     fetchUsers()
   }, [fetchUsers])
+
+  React.useEffect(() => {
+    apiGet<{ data: BankRef[] }>('/banks')
+      .then((res) => setBanks(res.data))
+      .catch(() => setBanks([]))
+  }, [])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -189,7 +226,17 @@ export function UsersPage() {
     setEditPassword('')
     setEditConfirmPassword('')
     setShowEditPassword(false)
+    setEditBankIds(new Set(user.banks.map((b) => b.id)))
     setEditError(null)
+  }
+
+  const toggleEditBank = (bankId: string) => {
+    setEditBankIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(bankId)) next.delete(bankId)
+      else next.add(bankId)
+      return next
+    })
   }
 
   const handleEdit = async (e: React.FormEvent) => {
@@ -214,6 +261,7 @@ export function UsersPage() {
       if (editPassword) {
         await apiPut(`/users/${editUser.id}/password`, { password: editPassword })
       }
+      await apiPut(`/users/${editUser.id}/banks`, { bankIds: Array.from(editBankIds) })
       setEditUser(null)
       await fetchUsers()
       toast({ title: 'Usuário atualizado', description: `${editName} foi atualizado com sucesso.` })
@@ -290,18 +338,25 @@ export function UsersPage() {
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10">
                 <tr className="border-b bg-muted/95 backdrop-blur-sm text-left">
-                  <th className="px-4 py-3 font-medium">Nome</th>
-                  <th className="px-4 py-3 font-medium">Email</th>
-                  <th className="px-4 py-3 font-medium">Telefone</th>
-                  <th className="px-4 py-3 font-medium">Papel</th>
-                  <th className="px-4 py-3 font-medium">Data de criação</th>
+                  <SortableTh label="Nome" column="name" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
+                  <SortableTh label="Email" column="email" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
+                  <SortableTh label="Telefone" column="phone" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
+                  <SortableTh label="Papel" column="role" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
+                  <th className="px-4 py-3 font-medium">Bancos</th>
+                  <SortableTh
+                    label="Data de criação"
+                    column="created_at"
+                    currentSort={sortBy}
+                    currentOrder={sortOrder}
+                    onSort={handleSort}
+                  />
                   <th className="px-4 py-3 font-medium text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {users.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                       Nenhum usuário encontrado.
                     </td>
                   </tr>
@@ -312,6 +367,9 @@ export function UsersPage() {
                       <td className="px-4 py-3 text-muted-foreground">{user.email}</td>
                       <td className="px-4 py-3 text-muted-foreground">{user.phone || '—'}</td>
                       <td className="px-4 py-3">{roleBadge(user.role)}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {user.banks.length === 0 ? '—' : user.banks.map((b) => b.name).join(', ')}
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground">
                         {new Date(user.created_at).toLocaleDateString('pt-BR')}
                       </td>
@@ -538,6 +596,16 @@ export function UsersPage() {
                 </div>
               </>
             )}
+            <div className="space-y-2">
+              <Label>Bancos vinculados</Label>
+              <BankMultiSelect
+                banks={banks}
+                selectedIds={editBankIds}
+                onToggle={toggleEditBank}
+                disabled={isEditing}
+                idPrefix="edit-user-bank"
+              />
+            </div>
             {editError && (
               <p className="text-sm text-destructive">{editError}</p>
             )}

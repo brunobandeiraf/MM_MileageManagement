@@ -7,14 +7,20 @@ import { ForgotPasswordPage } from './pages/public/ForgotPasswordPage'
 import { SetPasswordPage } from './pages/public/SetPasswordPage'
 import { DashboardPage } from './pages/private/DashboardPage'
 import { UsersPage } from './pages/private/UsersPage'
+import { BanksPage } from './pages/private/BanksPage'
+import { LoyaltyProgramsPage } from './pages/private/LoyaltyProgramsPage'
+import { TransferParitiesPage } from './pages/private/TransferParitiesPage'
 import { Toaster } from './components/ui/toaster'
 
 /**
  * Application routing.
  *
  * Public routes   : /  /login
- * Private routes  : /dashboard  (all authenticated users)
- *                   /usuarios   (ADMIN and FUNCIONARIO)
+ * Private routes  : /dashboard               (all authenticated users)
+ *                   /usuarios                (ADMIN and FUNCIONARIO)
+ *                   /bancos                  (ADMIN)
+ *                   /programas-fidelidade    (ADMIN)
+ *                   /paridade-transferencia  (ADMIN)
  * Fallback        : * → /
  *
  * Requirements: 6.1, 6.2, 6.3, 7.1, 7.2
@@ -43,6 +49,30 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['ADMIN', 'FUNCIONARIO']}>
                 <UsersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/bancos"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <BanksPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/programas-fidelidade"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <LoyaltyProgramsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/paridade-transferencia"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <TransferParitiesPage />
               </ProtectedRoute>
             }
           />

@@ -21,7 +21,11 @@ vi.mock('../../src/lib/prisma.js', () => ({
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
-    }
+    },
+    bank: {
+      findMany: vi.fn(),
+    },
+    $transaction: vi.fn(),
   }
 }));
 
@@ -43,7 +47,7 @@ vi.mock('resend', () => ({
   }))
 }));
 
-import { listUsers, createUser, updateUser, deleteUser, setUserPassword } from '../../src/modules/users/users.service.js';
+import { listUsers, createUser, updateUser, deleteUser, setUserPassword, setUserBanks } from '../../src/modules/users/users.service.js';
 import { prisma } from '../../src/lib/prisma.js';
 import { AppError } from '../../src/utils/errors.js';
 
@@ -70,6 +74,7 @@ function makeUserRow(overrides: Partial<{
     password_hash: overrides.password_hash ?? '$2b$10$fakehashvalue',
     created_at: overrides.created_at ?? new Date('2024-01-01T00:00:00.000Z'),
     updated_at: overrides.updated_at ?? new Date('2024-01-01T00:00:00.000Z'),
+    banks: [] as { bank: { id: string; name: string } }[],
   };
 }
 
@@ -95,6 +100,7 @@ describe('Property 15: Listagem de usuários nunca expõe password_hash', () => 
             phone: fc.constant(VALID_PHONE),
             role: fc.constantFrom('ADMIN' as const, 'FUNCIONARIO' as const, 'USER' as const),
             created_at: fc.date(),
+            banks: fc.constant([]),
           }),
           { maxLength: 20 }
         ),
@@ -113,6 +119,39 @@ describe('Property 15: Listagem de usuários nunca expõe password_hash', () => 
       ),
       { numRuns: 100 }
     );
+  });
+});
+
+// ─── Property 38: listUsers ordena pelo campo e direção pedidos ──────────────
+
+describe('Property 38: listUsers ordena pelo campo e direção pedidos', () => {
+  it('repassa sortBy/sortOrder para o Prisma como orderBy: { [sortBy]: sortOrder }', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.constantFrom('name', 'email', 'phone', 'role', 'created_at' as const),
+        fc.constantFrom('asc', 'desc' as const),
+        async (sortBy, sortOrder) => {
+          vi.mocked(prisma.user.findMany).mockResolvedValue([]);
+          vi.mocked(prisma.user.count).mockResolvedValue(0);
+
+          await listUsers(1, 20, 'ADMIN', undefined, sortBy, sortOrder);
+
+          const call = vi.mocked(prisma.user.findMany).mock.calls.at(-1)?.[0];
+          expect(call?.orderBy).toEqual({ [sortBy]: sortOrder });
+        }
+      ),
+      { numRuns: 50 }
+    );
+  });
+
+  it('usa created_at asc como padrão quando sortBy/sortOrder não são informados', async () => {
+    vi.mocked(prisma.user.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.user.count).mockResolvedValue(0);
+
+    await listUsers(1, 20, 'ADMIN');
+
+    const call = vi.mocked(prisma.user.findMany).mock.calls.at(-1)?.[0];
+    expect(call?.orderBy).toEqual({ created_at: 'asc' });
   });
 });
 
@@ -257,6 +296,7 @@ describe('Property 21: FUNCIONARIO nunca vê o ADMIN na listagem', () => {
             phone: fc.constant(VALID_PHONE),
             role: fc.constantFrom('FUNCIONARIO' as const, 'USER' as const),
             created_at: fc.date(),
+            banks: fc.constant([]),
           }),
           { maxLength: 20 }
         ),
@@ -493,4 +533,77 @@ describe('Property 26: setUserPassword — regras de visibilidade/alvo do ADMIN'
       { numRuns: 10 }
     );
   }, 10000);
+});
+
+// ─── Property 37: setUserBanks — mesmas regras de visibilidade do módulo ─────
+
+/**
+ * Property 37: setUserBanks segue a mesma regra de visibilidade das demais
+ * operações deste módulo (404 quando FUNCIONARIO tenta atingir o ADMIN), e
+ * rejeita bankIds que não existem no catálogo.
+ */
+describe('Property 37: setUserBanks — visibilidade e validação de bankIds', () => {
+  const mockTx = {
+    userBank: { deleteMany: vi.fn(), createMany: vi.fn() },
+    user: { findUniqueOrThrow: vi.fn() },
+  };
+
+  beforeEach(() => {
+    vi.mocked(prisma.bank.findMany).mockReset();
+    vi.mocked(prisma.$transaction).mockReset();
+    mockTx.userBank.deleteMany.mockReset();
+    mockTx.userBank.createMany.mockReset();
+    mockTx.user.findUniqueOrThrow.mockReset();
+    vi.mocked(prisma.$transaction).mockImplementation(((cb: any) => cb(mockTx)) as any);
+  });
+
+  it('lança 404 quando FUNCIONARIO tenta atribuir bancos ao ADMIN', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.uuid(), async (id) => {
+        vi.mocked(prisma.user.findUnique).mockResolvedValue(makeUserRow({ id, role: 'ADMIN' }));
+
+        await expect(setUserBanks(id, [], 'FUNCIONARIO')).rejects.toSatisfy(
+          (err: unknown) => err instanceof AppError && err.statusCode === 404
+        );
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+      }),
+      { numRuns: 50 }
+    );
+  });
+
+  it('lança 400 quando algum bankId não existe no catálogo', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(makeUserRow({ id: 'user-1', role: 'USER' }));
+    vi.mocked(prisma.bank.findMany).mockResolvedValue([{ id: 'real-bank' }] as any);
+
+    await expect(setUserBanks('user-1', ['real-bank', 'fake-bank'], 'ADMIN')).rejects.toSatisfy(
+      (err: unknown) => err instanceof AppError && err.statusCode === 400
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('substitui o conjunto de bancos dentro de uma transação (deleteMany + createMany)', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(makeUserRow({ id: 'user-1', role: 'USER' }));
+    vi.mocked(prisma.bank.findMany).mockResolvedValue([{ id: 'bank-a' }, { id: 'bank-b' }] as any);
+    mockTx.user.findUniqueOrThrow.mockResolvedValue({
+      ...makeUserRow({ id: 'user-1', role: 'USER' }),
+      banks: [
+        { bank: { id: 'bank-a', name: 'Banco A' } },
+        { bank: { id: 'bank-b', name: 'Banco B' } },
+      ],
+    });
+
+    const result = await setUserBanks('user-1', ['bank-a', 'bank-b'], 'ADMIN');
+
+    expect(mockTx.userBank.deleteMany).toHaveBeenCalledWith({ where: { user_id: 'user-1' } });
+    expect(mockTx.userBank.createMany).toHaveBeenCalledWith({
+      data: [
+        { user_id: 'user-1', bank_id: 'bank-a' },
+        { user_id: 'user-1', bank_id: 'bank-b' },
+      ],
+    });
+    expect(result.banks).toEqual([
+      { id: 'bank-a', name: 'Banco A' },
+      { id: 'bank-b', name: 'Banco B' },
+    ]);
+  });
 });

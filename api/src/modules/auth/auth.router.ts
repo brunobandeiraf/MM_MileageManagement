@@ -25,4 +25,7 @@ router.put('/me', authMiddleware, authController.updateMe);
 // PUT /me/password — requires authentication, self-service password change
 router.put('/me/password', authMiddleware, authController.changePassword);
 
+// PUT /me/banks — requires authentication, self-service bank assignment
+router.put('/me/banks', authMiddleware, authController.updateMyBanks);
+
 export default router;

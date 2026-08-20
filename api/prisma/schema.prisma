@@ -34,6 +34,8 @@ model User {
   created_at                 DateTime  @default(now()) @db.Timestamptz
   updated_at                 DateTime  @updatedAt @db.Timestamptz
 
+  banks UserBank[]
+
   @@map("users")
 }
 
@@ -47,4 +49,86 @@ model Lead {
   created_at         DateTime @default(now()) @db.Timestamptz
 
   @@map("leads")
+}
+
+// Global catalog of banks, managed exclusively by ADMIN. A bank can be
+// linked to one or more loyalty programs (via BankLoyaltyProgram) and can
+// be assigned to one or more users (via UserBank) — either by an ADMIN/
+// FUNCIONARIO managing a user, or by the user themselves.
+model Bank {
+  id         String   @id @default(uuid())
+  name       String   @unique @db.VarChar(255)
+  logo_url   String?
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+
+  loyaltyPrograms BankLoyaltyProgram[]
+  users           UserBank[]
+
+  @@map("banks")
+}
+
+// Global catalog of loyalty programs, managed exclusively by ADMIN. A
+// program (e.g. "Livelo") can be linked to one or more banks (e.g. Banco
+// do Brasil, Bradesco), and a bank can be linked to one or more programs.
+model LoyaltyProgram {
+  id         String   @id @default(uuid())
+  name       String   @unique @db.VarChar(255)
+  logo_url   String?
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+
+  banks         BankLoyaltyProgram[]
+  transfersFrom TransferParity[]     @relation("TransferParityFrom")
+  transfersTo   TransferParity[]     @relation("TransferParityTo")
+
+  @@map("loyalty_programs")
+}
+
+// Transfer parity between two loyalty programs — not every pair of programs
+// supports transferring points between them, so this is an explicit,
+// admin-curated catalog rather than something inferred. Directional: a row
+// from A to B does not imply the reverse is also possible. `from_points`
+// and `to_points` express the ratio (e.g. 1:1 — 1 point from A becomes 1
+// point in B); most parities today are 1:1, but the ratio can differ.
+model TransferParity {
+  id              String   @id @default(uuid())
+  from_program_id String
+  to_program_id   String
+  from_points     Int      @default(1)
+  to_points       Int      @default(1)
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @updatedAt @db.Timestamptz
+
+  fromProgram LoyaltyProgram @relation("TransferParityFrom", fields: [from_program_id], references: [id], onDelete: Cascade)
+  toProgram   LoyaltyProgram @relation("TransferParityTo", fields: [to_program_id], references: [id], onDelete: Cascade)
+
+  @@unique([from_program_id, to_program_id])
+  @@map("transfer_parities")
+}
+
+// Join table: which loyalty programs a bank offers.
+model BankLoyaltyProgram {
+  bank_id            String
+  loyalty_program_id String
+  created_at         DateTime @default(now()) @db.Timestamptz
+
+  bank           Bank           @relation(fields: [bank_id], references: [id], onDelete: Cascade)
+  loyaltyProgram LoyaltyProgram @relation(fields: [loyalty_program_id], references: [id], onDelete: Cascade)
+
+  @@id([bank_id, loyalty_program_id])
+  @@map("bank_loyalty_programs")
+}
+
+// Join table: which banks are linked to a user's account.
+model UserBank {
+  user_id    String
+  bank_id    String
+  created_at DateTime @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  bank Bank @relation(fields: [bank_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, bank_id])
+  @@map("user_banks")
 }

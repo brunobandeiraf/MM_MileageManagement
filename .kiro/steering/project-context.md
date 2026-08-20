@@ -49,8 +49,11 @@ MM_MileageManagement/
 │   │   │   ├── auth.middleware.ts # Valida JWT Bearer token
 │   │   │   └── requireRole.ts     # Controle de acesso por papel
 │   │   ├── modules/
-│   │   │   ├── auth/              # login, logout, /me
-│   │   │   └── users/             # CRUD usuários (só ADMIN)
+│   │   │   ├── auth/               # login, logout, /me, /me/password, /me/banks
+│   │   │   ├── users/               # CRUD usuários (ADMIN|FUNCIONARIO) + /:id/password, /:id/banks
+│   │   │   ├── banks/               # Catálogo global de bancos (ADMIN escreve, todos leem)
+│   │   │   ├── loyaltyPrograms/     # Catálogo de programas de fidelidade de bancos
+│   │   │   └── transferParities/    # Paridade de transferência entre programas
 │   │   ├── utils/
 │   │   │   ├── password.ts        # hashPassword, comparePassword
 │   │   │   ├── token.ts           # signToken, verifyToken
@@ -60,7 +63,9 @@ MM_MileageManagement/
 │   ├── prisma/
 │   │   ├── schema.prisma
 │   │   ├── migrations/
-│   │   └── seed.ts                # Seed seguro do admin (lê ADMIN_EMAIL/PASSWORD de env)
+│   │   ├── seed.ts                # Seed seguro do admin (lê ADMIN_EMAIL/PASSWORD de env)
+│   │   ├── seedBanks.ts           # npm run seed:banks — TRUNCA banks+loyalty_programs e recria (⚠️ ver seção própria)
+│   │   └── seedTransferParities.ts # npm run seed:parities — trunca transfer_parities e recria
 │   ├── tests/unit/                # Testes PBT com fast-check
 │   ├── Dockerfile                 # Multi-stage, alpine, non-root
 │   ├── .dockerignore
@@ -75,16 +80,23 @@ MM_MileageManagement/
 │   │   │   │   └── Header.tsx     # Toggle tema + info usuário
 │   │   │   └── shared/
 │   │   │       ├── ProtectedRoute.tsx
-│   │   │       └── ThemeProvider.tsx
+│   │   │       ├── ThemeProvider.tsx
+│   │   │       ├── ProfileDialog.tsx   # "Meu Perfil": dados + Alterar Senha + Meus Bancos
+│   │   │       ├── BankMultiSelect.tsx # checkboxes de bancos (Programas, editar usuário, Meu Perfil)
+│   │   │       ├── LogoUpload.tsx      # logo de Banco/Programa, com recorte (react-easy-crop)
+│   │   │       └── SortableTh.tsx      # <th> clicável, alterna asc/desc
 │   │   ├── contexts/
-│   │   │   ├── AuthContext.tsx    # user, isLoading, login(), logout()
+│   │   │   ├── AuthContext.tsx    # user (com banks[]), isLoading, login(), logout(), updateProfile(), changePassword(), updateMyBanks()
 │   │   │   └── ThemeContext.tsx   # theme, toggleTheme()
 │   │   ├── hooks/
 │   │   │   ├── useAuth.ts
 │   │   │   └── useTheme.ts
+│   │   ├── lib/
+│   │   │   ├── image.ts           # resizeImageToDataUrl() — usado pelo avatar
+│   │   │   └── cropImage.ts       # getCroppedImageDataUrl() — usado pelo LogoUpload
 │   │   ├── pages/
-│   │   │   ├── public/            # HomePage, LoginPage
-│   │   │   └── private/           # DashboardPage, UsersPage
+│   │   │   ├── public/            # HomePage, LoginPage, ForgotPasswordPage, SetPasswordPage
+│   │   │   └── private/           # DashboardPage, UsersPage, BanksPage, LoyaltyProgramsPage, TransferParitiesPage
 │   │   └── services/api.ts        # fetch wrapper com credentials: 'include'
 │   └── .env.example
 ├── docker-compose.yml             # Postgres local + API (perfil docker)
@@ -127,6 +139,8 @@ cd api
 npm install
 npx prisma migrate dev    # primeira vez
 npm run seed              # criar admin
+npm run seed:banks        # opcional — catálogo de bancos/programas (⚠️ TRUNCA se já existir, ver seção própria)
+npm run seed:parities     # opcional — paridades de transferência (depende do seed:banks)
 npm run dev               # http://localhost:3000
 
 # 3. Frontend
@@ -173,7 +187,62 @@ model Lead {
   created_at         DateTime @default(now()) @db.Timestamptz
   @@map("leads")
 }
+
+// Catálogo global de bancos — só ADMIN cria/edita/exclui, todo papel autenticado lê.
+model Bank {
+  id         String   @id @default(uuid())
+  name       String   @unique @db.VarChar(255)
+  logo_url   String?  // data URI base64, mesmo padrão do avatar_url
+  loyaltyPrograms BankLoyaltyProgram[]
+  users           UserBank[]
+  @@map("banks")
+}
+
+// Catálogo de programas de fidelidade DE BANCOS (não confundir com futuro
+// catálogo de programas de fidelidade de companhias aéreas — são separados).
+model LoyaltyProgram {
+  id         String   @id @default(uuid())
+  name       String   @unique @db.VarChar(255)
+  logo_url   String?
+  banks         BankLoyaltyProgram[]
+  transfersFrom TransferParity[] @relation("TransferParityFrom")
+  transfersTo   TransferParity[] @relation("TransferParityTo")
+  @@map("loyalty_programs")
+}
+
+// N:N — quais programas um banco oferece (ex.: Livelo pertence a BB e Bradesco).
+model BankLoyaltyProgram {
+  bank_id String
+  loyalty_program_id String
+  @@id([bank_id, loyalty_program_id])
+  @@map("bank_loyalty_programs")
+}
+
+// N:N — quais bancos estão vinculados à conta de um usuário.
+model UserBank {
+  user_id String
+  bank_id String
+  @@id([user_id, bank_id])
+  @@map("user_banks")
+}
+
+// Paridade de transferência entre dois programas — direcional (A→B não
+// implica B→A) e curada manualmente pelo ADMIN, nunca inferida.
+model TransferParity {
+  id              String @id @default(uuid())
+  from_program_id String
+  to_program_id   String
+  from_points     Int    @default(1)
+  to_points       Int    @default(1)
+  fromProgram LoyaltyProgram @relation("TransferParityFrom", fields: [from_program_id], references: [id])
+  toProgram   LoyaltyProgram @relation("TransferParityTo", fields: [to_program_id], references: [id])
+  @@unique([from_program_id, to_program_id])
+  @@map("transfer_parities")
+}
 ```
+
+- `User.banks: UserBank[]` — todo papel pode vincular um ou mais bancos à própria conta (`PUT /auth/me/banks`); ADMIN/FUNCIONARIO também vinculam bancos a um usuário que gerenciam (`PUT /users/:id/banks`), com a mesma regra de visibilidade do resto do módulo (FUNCIONARIO nunca mexe no ADMIN)
+- Todos os campos `logo_url` seguem exatamente o padrão do `avatar_url` do usuário: data URI base64, limite de tamanho no backend (`MAX_LOGO_LENGTH`), recorte/redimensionamento no client antes do upload — ver seção "Catálogo de Bancos..." abaixo
 
 - `Lead` é só captação da Home page pública — não vira `User` automaticamente. Conversão de lead em usuário/cliente é manual (Admin cria pelo painel de Gestão de Usuários quando fechar negócio). Não existe ainda uma tela de listagem de leads — só a tabela e o email de notificação
 
@@ -199,19 +268,29 @@ model Lead {
 | GET    | `/api/health`      | —                      | Health check                                     |
 | POST   | `/api/auth/login`  | —                      | Login, seta httpOnly cookie JWT                  |
 | POST   | `/api/auth/logout` | JWT                    | Logout, limpa cookie                             |
-| GET    | `/api/auth/me`     | JWT                    | Dados do usuário autenticado (`id, name, email, phone, avatar_url, role`) |
+| GET    | `/api/auth/me`     | JWT                    | Dados do usuário autenticado (`id, name, email, phone, avatar_url, role, banks[]`) |
 | PUT    | `/api/auth/me`     | JWT                    | Self-service: edita o próprio nome/email/telefone/foto — qualquer papel |
-| GET    | `/api/users`       | JWT+ADMIN\|FUNCIONARIO | Listagem paginada de usuários — query `page`, `limit` (default 20), `search` (nome, case-insensitive) |
+| PUT    | `/api/auth/me/password` | JWT              | Self-service: troca a própria senha informando a senha atual — qualquer papel (ver seção "Senha de usuário") |
+| PUT    | `/api/auth/me/banks` | JWT                 | Self-service: substitui a lista de bancos vinculados à própria conta — qualquer papel |
+| GET    | `/api/users`       | JWT+ADMIN\|FUNCIONARIO | Listagem paginada de usuários — query `page`, `limit` (default 20), `search` (nome), `sortBy` (name\|email\|phone\|role\|created_at, default created_at), `sortOrder` (asc\|desc, default asc) |
 | POST   | `/api/users`       | JWT+ADMIN\|FUNCIONARIO | Cria usuário (`name`, `email`, `phone` obrigatórios; `role` opcional, default `USER`) + envia convite de definição de senha por email |
 | PUT    | `/api/users/:id`   | JWT+ADMIN\|FUNCIONARIO | Atualiza nome, email e/ou telefone               |
 | DELETE | `/api/users/:id`   | JWT+ADMIN\|FUNCIONARIO | Remove usuário                                   |
 | PUT    | `/api/users/:id/password` | JWT+ADMIN\|FUNCIONARIO | Define diretamente uma nova senha para USER/FUNCIONARIO (usado pelo diálogo "Editar"). Nunca permitido para alvo `ADMIN` (400). Notifica o usuário por email |
+| PUT    | `/api/users/:id/banks` | JWT+ADMIN\|FUNCIONARIO | Substitui a lista de bancos vinculados ao usuário gerenciado |
 | POST   | `/api/auth/forgot-password` | —                | Self-service: se o email existir, envia o link de definição de senha. Resposta genérica sempre — nunca revela se o email existe |
 | POST   | `/api/auth/set-password` | —                 | Consome o token do email (convite inicial ou "esqueci minha senha") e define a senha. Público — o token é a credencial |
+| GET    | `/api/banks`       | JWT                    | Lista todos os bancos com os programas vinculados — qualquer papel |
+| POST/PUT/DELETE | `/api/banks[/:id]` | JWT+ADMIN     | CRUD do catálogo de bancos (`name`, `logo_url` opcional) |
+| GET    | `/api/loyalty-programs` | JWT              | Lista todos os programas de fidelidade de bancos com os bancos vinculados — qualquer papel |
+| POST/PUT/DELETE | `/api/loyalty-programs[/:id]` | JWT+ADMIN | CRUD do catálogo de programas (`name`, `logo_url` opcional, `bankIds[]` — substitui o vínculo inteiro) |
+| GET    | `/api/transfer-parities` | JWT               | Lista todas as paridades de transferência (De → Para + proporção) — qualquer papel |
+| POST/PUT/DELETE | `/api/transfer-parities[/:id]` | JWT+ADMIN | CRUD da paridade (`fromProgramId`, `toProgramId`, `fromPoints`, `toPoints`) |
 | GET    | `/api/public/contact` | —                    | Público: email + telefone do ADMIN mais antigo, pra Home page (nunca expõe id/nome/role) |
 | POST   | `/api/leads`       | —                      | Público: captação de lead da Home page (`name`, `whatsapp`, `email`, `monthly_card_spend` obrigatórios; `trips_per_year` opcional). Persiste em `leads` e notifica `ADMIN_EMAIL` por email (best-effort) |
 
 - Permissões finas (FUNCIONARIO nunca vê/edita/exclui/define senha do ADMIN; só ADMIN cria um ADMIN ou FUNCIONARIO) são resolvidas dentro de `users.service.ts`, não no `requireRole` do router — o router só garante "é ADMIN ou FUNCIONARIO".
+- Padrão dos módulos `banks`/`loyaltyPrograms`/`transferParities`: leitura (`GET`) liberada pra qualquer papel autenticado (Team e Usuário precisam da lista pra vincular banco a si mesmo/a alguém), escrita restrita a `requireRole('ADMIN')` no router.
 
 ### Payload JWT
 ```json
@@ -250,7 +329,7 @@ Com o domínio de teste `onboarding@resend.dev`, a API do Resend só aceita envi
 | `USER` | "Usuário" | Dashboard, perfil próprio |
 
 - **Importante**: o rótulo visual de `FUNCIONARIO` é **"Team"** — só o texto exibido mudou (decisão de produto), o valor do enum/role continua `FUNCIONARIO` em todo o código/API/DB. Não renomear o enum.
-- Sidebar mostra "Gestão de Usuários" para **ADMIN e FUNCIONARIO** (ausente do DOM para USER)
+- Sidebar mostra "Gestão de Usuários" para **ADMIN e FUNCIONARIO** (ausente do DOM para USER); só ADMIN também vê o submenu "Cadastros" (Bancos/Programas/Paridade — ver seção própria)
 - Proteção dupla: frontend (`ProtectedRoute allowedRoles`) + backend (`requireRole` no router + checagem fina em `users.service.ts`)
 - Quando `ProtectedRoute` bloqueia por papel (usuário autenticado mas sem `allowedRoles`), **redireciona pra `/dashboard`** — nunca mostra uma página de erro 403 solta. Isso cobre o caso de alguém cair em `/login?redirect=/usuarios` (link antigo, favorito) e ser jogado de volta pra uma tela de erro logo após logar: em vez disso, sempre volta pro dashboard, a "home" de qualquer papel autenticado
 - Badge de papel na UI: Admin (âmbar) / Team (azul) / Usuário (cinza)
@@ -262,12 +341,13 @@ Com o domínio de teste `onboarding@resend.dev`, a API do Resend só aceita envi
 - Campo de busca por nome acima da tabela, debounce de 400ms, delega a filtragem pro backend (`?search=`) — nunca filtrar só no array já carregado, porque isso quebra com listas grandes/paginadas
 - Ao buscar, a paginação volta para a página 1
 - A tabela tem `max-h-[60vh] overflow-y-auto` com `<thead>` `sticky` — quando a lista enche a altura disponível, ela ganha scroll interno em vez de empurrar a paginação pra fora da tela
+- Colunas Nome/Email/Telefone/Papel/Data de criação são ordenáveis clicando no cabeçalho (`SortableTh`, server-side — ver seção "Ordenação e busca nas listas"); coluna "Bancos" (lista de bancos vinculados ao usuário) não é ordenável
 
 ---
 
-## Senha de usuário — dois caminhos, uma infra só
+## Senha de usuário — três caminhos
 
-Existem exatamente dois jeitos de uma senha ser definida. **Nunca criar um terceiro mecanismo** — sempre reaproveitar `api/src/utils/resetToken.ts` + `api/src/utils/passwordInvite.ts` (`issueSetPasswordEmail`) + `POST /auth/set-password`.
+Existem exatamente três jeitos de uma senha ser definida/alterada. Os dois primeiros **sempre** reaproveitam a mesma infra de token — `api/src/utils/resetToken.ts` + `api/src/utils/passwordInvite.ts` (`issueSetPasswordEmail`) + `POST /auth/set-password`. **Nunca criar um quarto mecanismo** sem atualizar esta seção.
 
 ### 1. Self-service (o próprio dono da conta)
 
@@ -285,26 +365,50 @@ Existem exatamente dois jeitos de uma senha ser definida. **Nunca criar um terce
 - Campo escondido na UI quando `editUser.role === 'ADMIN'`, e bloqueado no backend independentemente do que a UI mostrar (autorização nunca só no frontend).
 - Validação de tamanho mínimo (`MIN_PASSWORD_LENGTH = 8`, exportado de `api/src/utils/password.ts`) é a fonte única — usada tanto aqui quanto em `set-password`, não duplicar o número.
 
+### 3. Self-service — o próprio usuário troca a própria senha (logado)
+
+- Seção "Alterar Senha" dentro de "Meu Perfil" (`ProfileDialog.tsx`) — três campos: Senha Atual, Nova Senha, Confirmar Nova Senha. Disponível pra qualquer papel.
+- `PUT /api/auth/me/password` (`changeMyPassword` em `auth.service.ts`) — **não usa a infra de token/email dos outros dois caminhos**, porque a identidade já é provada de outro jeito: a pessoa está autenticada (cookie JWT) *e* informa a senha atual (`comparePassword` contra o hash existente). Se a senha atual não bater, 401.
+- Igual ao caminho 2: invalida qualquer convite/token pendente e notifica por email que a senha mudou.
+- Diferente do caminho 2: aqui é sempre a própria pessoa alterando a própria senha (não existe "trocar a senha de outro usuário" nesse endpoint) — por isso não tem a restrição de "nunca pra ADMIN": o próprio ADMIN pode usar esse caminho para trocar a própria senha (diferente do caminho 2, onde ninguém — nem outro ADMIN — pode setar a senha de um ADMIN).
+
 ---
 
 ## Tema Dark/Light
 
-- **Padrão**: dark mode
-- **Toggle**: dentro do menu do avatar no Header (item "Modo claro"/"Modo escuro") — não é mais um ícone solto na barra
+- **Padrão**: **light mode** (mudou — era dark). `ThemeProvider.tsx` só entra em dark se `localStorage['theme'] === 'dark'` explicitamente; qualquer outro valor (ou ausente) cai em light.
+- **Toggle**: dentro do menu do avatar no Header (item "Modo claro"/"Modo escuro")
 - **Persistência**: `localStorage['theme']`
-- **Implementação**: classe `dark` no `<html>` via ThemeProvider
+- **Implementação**: classe `dark` no `<html>` via ThemeProvider (presente = dark, ausente = light)
 - Tailwind configurado com `darkMode: 'class'`
+
+### Paleta — azul no light, âmbar preservado no dark
+
+- **Light mode** (padrão): fundo branco, texto preto, **detalhes em azul** (`blue-600`/`blue-700` como acento visual — botões, ícones, bordas ativas, links). Tokens `--primary`/`--ring` em `web/src/index.css` (`:root`) foram trocados para azul (`hsl(221.2 83.2% 53.3%)`, ~ Tailwind `blue-600`) — isso propaga automaticamente pra qualquer componente que usa `bg-primary`/`text-primary`/`ring` (botões default, item ativo da Sidebar, avatar fallback etc.), sem precisar tocar em cada tela.
+- **Dark mode**: **propositalmente inalterado** — continua com o acento âmbar (`amber-500`/`amber-400`) que já existia antes da mudança de paleta. O bloco `.dark` em `index.css` não foi tocado.
+- **Como isso foi feito nas páginas com cor "hardcoded"** (HomePage, Login/ForgotPassword/SetPassword, Sidebar, DashboardPage — telas que usavam `amber-500` direto em vez do token `--primary`): cada classe `amber-*` virou um par `blue-*` (light) + `dark:amber-*` explícito (preserva o dark exatamente como estava). Ex.: `text-amber-500` → `text-blue-600 dark:text-amber-500`. **Ao adicionar uma cor de destaque nova em qualquer tela, seguir esse mesmo padrão de par** — nunca só trocar amber→blue sem o `dark:` de volta, ou o dark muda sem querer.
+- **Exceção deliberada — não mexer**: os badges de papel de usuário em `UsersPage.tsx` (`roleBadge()`) usam `amber-100/800/300` pro Admin, `sky-100/800/300` pro Team, `slate-*` pro Usuário — isso é cor **semântica** (distingue papéis), não é o acento de marca. Não faz parte da paleta azul/âmbar e não deve ganhar par `dark:` nem ser convertido.
 
 ---
 
 ## Menu do usuário (Header) e "Meu Perfil"
 
-- **Nome do usuário, papel e botão "Sair" não ficam mais na Sidebar** (removidos de lá) — tudo isso vive agora num menu dropdown no canto superior direito do Header, aberto ao clicar no avatar (foto redonda pequena, `h-8 w-8`; iniciais como fallback quando não há foto)
-- A barra do Header **nunca mostra nome/papel de forma permanente** — só aparecem dentro do dropdown quando aberto (`DropdownMenuLabel`)
-- Ordem dos itens no dropdown: nome+papel (label, não clicável) → separador → **Meu Perfil** → toggle de tema → separador → **Sair**
-- Sidebar agora só tem: logo no topo + navegação (Dashboard, Gestão de Usuários quando aplicável) — sem nenhuma seção de usuário embaixo
-- **"Meu Perfil"** (`web/src/components/shared/ProfileDialog.tsx`) é self-service: qualquer papel (ADMIN, FUNCIONARIO, USER) pode editar o próprio nome, email, telefone e foto — via `PUT /api/auth/me` (`updateMe` em `auth.service.ts`), diferente de `PUT /api/users/:id` (que é admin/Team editando OUTRA pessoa). Nunca reaproveitar um endpoint pro outro caso
-- Depois de salvar, `AuthContext.updateProfile()` já atualiza o `user` do contexto (não precisa de reload) — o avatar do Header reflete a mudança na hora
+- **Nome do usuário, papel e botão "Sair" não ficam na Sidebar** — vivem no canto superior direito do Header. O avatar é maior (`h-11 w-11`, era `h-8 w-8`) e o **nome + papel ficam permanentemente visíveis à esquerda do avatar**, empilhados em duas linhas alinhadas à direita (`text-right`, nome em cima / papel embaixo, ambos truncando com `max-w-[9rem]`) — mudou de "só aparece dentro do dropdown" pra "sempre visível na barra", pra ficar visualmente balanceado com o avatar maior
+- Clicar no avatar (ou no bloco nome+papel) abre o dropdown — como o papel já está sempre visível na barra, o dropdown **não repete mais** nome/papel no topo (removido o `DropdownMenuLabel` redundante); vai direto pros itens
+- Ordem dos itens no dropdown: **Meu Perfil** → toggle de tema → separador → **Sair**
+- Sidebar tem: logo no topo + navegação (Dashboard, Gestão de Usuários quando aplicável, submenu **Cadastros** pro ADMIN — ver seção própria) — sem nenhuma seção de usuário embaixo
+- **"Meu Perfil"** (`web/src/components/shared/ProfileDialog.tsx`) é self-service, qualquer papel, e hoje tem **três seções** dentro do mesmo diálogo:
+  1. Dados (nome, email, telefone, foto) — `PUT /api/auth/me`
+  2. **Alterar Senha** (senha atual, nova senha, confirmar) — `PUT /api/auth/me/password` (ver "Senha de usuário", caminho 3)
+  3. **Meus Bancos** (`BankMultiSelect`) — `PUT /api/auth/me/banks`, autoatribuição de banco (ver seção "Catálogo de Bancos...")
+- Diferente de `PUT /api/users/:id` (que é admin/Team editando OUTRA pessoa) — nunca reaproveitar um endpoint pro outro caso
+- Depois de salvar qualquer seção, o contexto (`AuthContext.updateProfile()` / `changePassword()` / `updateMyBanks()`) já atualiza o `user` — não precisa de reload
+
+### Diálogos (`Dialog`/`DialogContent`) — altura máxima + scroll interno
+
+- `web/src/components/ui/dialog.tsx` foi corrigido pra **nunca mais estourar a viewport**: `DialogContent` é `flex flex-col max-h-[85vh]`, com um `<div>` interno `flex-1 min-h-0 overflow-y-auto` que é a única parte que rola — cabeçalho/título e o botão de fechar (X) ficam fixos, fora da área de scroll.
+- **Pegadinha resolvida**: só `max-h` + `overflow-y-auto` no wrapper *não* funciona em flex/grid — o filho não encolhe sem `min-h-0` explícito (limitação conhecida do CSS flexbox). Se um diálogo novo "crescer além da tela" de novo, checar primeiro se o conteúdo tá dentro dessa estrutura padrão em vez de reinventar.
+- Isso é global (afeta todo `<Dialog>` do sistema) — não precisa replicar em cada tela.
 
 ### Foto de perfil (avatar)
 
@@ -316,15 +420,78 @@ Existem exatamente dois jeitos de uma senha ser definida. **Nunca criar um terce
 
 ---
 
+## Sidebar — submenu "Cadastros"
+
+- ADMIN vê um item de menu expansível **"Cadastros"** (ícone `Layers`, seta que gira ao abrir/fechar) agrupando as telas de catálogo: **Bancos**, **Programas de Fidelidade de Bancos**, **Paridade de Transferência**. Fica fechado por padrão, mas abre sozinho quando a rota atual é uma das filhas (`CADASTROS_ROUTES` em `Sidebar.tsx`) — ex.: entrar direto em `/bancos` já mostra o submenu aberto com o item ativo destacado.
+- **Motivo de agrupar num submenu em vez de 3 itens soltos no menu principal**: já nasceu pensando em crescer — a ideia é que futuros catálogos (Companhias Aéreas, Programas de Fidelidade de Cia Aérea) entrem como novos itens dentro do mesmo "Cadastros", sem inflar o menu principal. Ao adicionar um catálogo novo, adicionar aqui, não como item solto.
+- Rotas: `/bancos`, `/programas-fidelidade`, `/paridade-transferencia` — todas `ProtectedRoute allowedRoles={['ADMIN']}`.
+
+---
+
+## Catálogo de Bancos, Programas de Fidelidade e Paridade de Transferência
+
+Feature grande adicionada depois do MVP inicial. Resumo do modelo mental: **Banco** e **Programa de Fidelidade de Banco** são catálogos globais N:N entre si (um banco pode oferecer vários programas, um programa — ex. Livelo — pode pertencer a vários bancos). Usuários se vinculam a **bancos** (não a programas diretamente). Programas podem ter **paridade de transferência** entre si (quanto de um programa vira quanto de outro).
+
+### Permissões (padrão em todos os três módulos)
+
+- **Leitura livre** pra qualquer papel autenticado (ADMIN, FUNCIONARIO, USER) — Team e Usuário precisam da lista de bancos pra se autoatribuir ou atribuir a alguém.
+- **Escrita (criar/editar/excluir) só ADMIN**, via `requireRole('ADMIN')` no router de cada módulo (`banks`, `loyaltyPrograms`, `transferParities`).
+
+### Bancos (`Bank`) e Programas de Fidelidade de Bancos (`LoyaltyProgram`)
+
+- Nome **obrigatoriamente único** em ambos (`@unique` no schema; 409 se duplicado).
+- Vínculo N:N via `BankLoyaltyProgram` — gerenciado **a partir da tela de Programa** (o formulário de programa tem um multi-select de bancos que substitui o vínculo inteiro a cada salvamento; a tela de Banco só mostra os programas vinculados, somente leitura ali).
+- **"Programas de Fidelidade de Bancos"**, não só "Programas de Fidelidade" — nome escolhido de propósito porque no futuro vai existir um catálogo separado de programas de fidelidade de **companhias aéreas** (Smiles, LATAM Pass etc.), que não é a mesma coisa. Não misturar os dois catálogos quando essa segunda feature for implementada.
+- Cada um pode ter uma **logo** (`logo_url`, data URI base64 — mesmíssimo padrão do `avatar_url`, ver seção "Foto de perfil" acima): tamanho máximo validado no backend (`MAX_LOGO_LENGTH` em `banks.service.ts`/`loyaltyPrograms.service.ts`), e no client passa por **recorte antes do upload** (`web/src/components/shared/LogoUpload.tsx` + `web/src/lib/cropImage.ts`, usando a lib `react-easy-crop` — única dependência nova instalada nesta feature). Diferente do avatar (que só redimensiona automaticamente), aqui o usuário **arrasta pra posicionar e usa um slider de zoom** pra escolher exatamente a área/tamanho da imagem antes de aplicar — resultado final limitado a 512px no lado maior, JPEG.
+- Tabelas de listagem mostram uma miniatura da logo (fallback: inicial do nome, quadrado cinza) ao lado do nome.
+
+### Vínculo usuário↔banco (`UserBank`)
+
+- Um usuário pode ter **um ou vários bancos** vinculados à própria conta.
+- Dois pontos de entrada pro mesmo relacionamento, cada um com seu endpoint:
+  - **Autoatribuição** (qualquer papel, a si mesmo): seção "Meus Bancos" em "Meu Perfil" → `PUT /api/auth/me/banks`
+  - **Atribuição por Admin/Team** (a um usuário gerenciado): multi-select "Bancos vinculados" no diálogo "Editar Usuário" da Gestão de Usuários → `PUT /api/users/:id/banks`, mesma regra de visibilidade do resto do módulo `users` (FUNCIONARIO nunca mexe no ADMIN)
+- Ambos os endpoints **substituem a lista inteira** a cada chamada (não é incremental) — o front sempre manda o array completo de `bankIds` selecionados.
+
+### Paridade de Transferência (`TransferParity`)
+
+- Tela própria: "Paridade de Transferência" (`web/src/pages/private/TransferParitiesPage.tsx`), dentro do submenu Cadastros.
+- Registra que **é possível transferir pontos de um programa de fidelidade pra outro**, e em qual proporção — ex.: BTG → Livelo, 1:1. **Não é algo universal**: só existe paridade entre o par que o ADMIN cadastrou explicitamente. Nunca inferir/assumir que existe transferência entre dois programas quaisquer.
+- **Direcional**: uma linha De=A/Para=B não implica a volta (B→A) — se a transferência funcionar nos dois sentidos, precisa de duas linhas.
+- Proporção armazenada como dois inteiros positivos (`from_points`/`to_points`, ex. `1`/`1`) em vez de um decimal único — deixa o "1:1" (ou "2:3" etc.) explícito na UI sem depender de arredondamento.
+- Restrições de negócio (`transferParities.service.ts`): não pode ter paridade de um programa consigo mesmo (400); par (De, Para) é único (409 se duplicado); ambos os programas precisam existir (400 senão).
+- Lista com logo dos dois programas lado a lado, seta entre eles, proporção, busca (por qualquer um dos dois nomes) e ordenação clicável (ver seção "Ordenação e busca nas listas").
+
+### Seeds — `npm run seed:banks` e `npm run seed:parities`
+
+- **`prisma/seedBanks.ts`** (`npm run seed:banks`): cadastra ~29 bancos que atuam no Brasil com seus respectivos programas (curadoria manual — só bancos com programa de fidelidade próprio bem estabelecido; cooperativas/bancos sem programa conhecido foram deixados de fora de propósito, pra não inventar vínculo). Livelo aparece repetido pra Banco do Brasil e Bradesco (mesmo programa, dois bancos — é assim que o N:N deve ser usado).
+  - ⚠️ **Esse script TRUNCA `banks` e `loyalty_programs` inteiros antes de recriar** (`deleteMany({})` nos dois, que cascateia pra `BankLoyaltyProgram`, `UserBank` e `TransferParity`). **Nunca rodar de novo sem checar antes se algum banco/programa tem `logo_url` enviado manualmente pela UI** — rodar o seed apaga essas logos junto (aconteceu de precisar adicionar 2 bancos novos ao catálogo depois que o usuário já tinha subido logos reais pra Banco do Brasil/Bradesco; a solução foi criar os 2 bancos novos via chamada direta à API em vez de re-rodar o seed). Se precisar adicionar/ajustar um banco pontual, preferir `POST`/`PUT` direto em vez de re-seed.
+- **`prisma/seedTransferParities.ts`** (`npm run seed:parities`): cadastra a lista de paridades vigente hoje (14 linhas, todas 1:1 apontando pra Livelo — C6 Átomos, BTG, BV Merece, PAN Mais, Nordeste Mais, Banestes, Sisprime, Unicred, Coopera, Safra Rewards, Nomad, Efí, XP, BRB). Também trunca (`transfer_parities`) antes de recriar — mais seguro de re-rodar porque essa tabela não guarda nada além do que o próprio seed define, mas se o ADMIN já tiver cadastrado paridades extras manualmente pela UI, elas também seriam apagadas.
+  - Depende de `seed:banks` já ter rodado antes (resolve os programas por nome exato); loga um aviso e pula qualquer linha cujo programa não seja encontrado, em vez de falhar tudo.
+- Essa lista de paridades **pode mudar no futuro** — o motivo de existir uma tela de CRUD além do seed é justamente permitir o ADMIN ajustar sem precisar de deploy/migration.
+
+---
+
+## Ordenação e busca nas listas
+
+- Cabeçalho de coluna clicável (`web/src/components/shared/SortableTh.tsx`) em toda tela de listagem: primeiro clique ordena ascendente, segundo clique na mesma coluna inverte pra descendente, clique em outra coluna troca e reinicia em ascendente. Ícone (`ChevronUp`/`ChevronDown`/`ChevronsUpDown` do lucide-react) indica a coluna/direção ativa.
+- **Gestão de Usuários**: ordenação **no servidor** (a listagem é paginada) — `GET /users?sortBy=...&sortOrder=...`, campos permitidos: `name`, `email`, `phone`, `role`, `created_at` (não dá pra ordenar pela coluna "Bancos", que é uma lista por linha, não um valor único).
+- **Bancos / Programas de Fidelidade de Bancos / Paridade de Transferência**: ordenação **no client** (`Array.sort` num `useMemo`) — essas listas já vêm inteiras da API de uma vez (sem paginação), então não precisam de round-trip pra reordenar. Bancos/Programas também aceitam ordenar pela coluna de vínculos, usando a **contagem** de itens vinculados como critério (não dá pra ordenar alfabeticamente uma lista de badges).
+- **Busca nas telas de Bancos e Programas**: o campo de busca casa tanto o nome da própria entidade **quanto o nome de qualquer entidade vinculada** — buscar "Bradesco" na tela de Programas encontra o Livelo (porque Livelo está vinculado ao Bradesco), e buscar "Livelo" na tela de Bancos encontra Banco do Brasil e Bradesco. Isso não é o comportamento óbvio de um filtro simples — foi um bug reportado ("o filtro não funciona") porque a primeira versão só casava o nome da própria linha; ao criar uma tela de listagem nova com relacionamento, replicar esse padrão de busca-nos-dois-lados desde o início.
+
+---
+
 ## Home Page Pública (Landing Page)
 
-- `web/src/pages/public/HomePage.tsx` é a página institucional/comercial (não logado) — funciona como cartão de visita pra quem chega no site, não como tela de login. O CTA principal é o formulário de lead ("Solicitar Análise de Perfil"), não "Entrar" — "Entrar" fica no nav como botão outline âmbar (visível, mas secundário) e no rodapé
-- Estrutura atual: Hero → programas parceiros (marquee) → **Números** (imagem à esquerda + estatísticas com contagem animada empilhadas à direita) → Como Funciona (5 etapas) → **Comparativo** (tabela pareada, ver abaixo) → O que está incluso → Resultados → Formulário de lead → FAQ → Rodapé — **não existem mais** a seção "Dores" isolada (removida; virou a coluna esquerda do Comparativo) nem a seção "Benefícios"/"Por que delegar sua gestão de milhas" (removida; array `BENEFITS` também foi deletado do código)
-- Headline do hero (H1): "Acúmulo de milhas não é sorte. **É método!** E o método **é nosso** para fazer suas milhas trabalharem a seu favor." — dois trechos com destaque em gradiente âmbar (`bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent`): "É método!" e "é nosso"
+- `web/src/pages/public/HomePage.tsx` é a página institucional/comercial (não logado) — funciona como cartão de visita pra quem chega no site, não como tela de login. O CTA principal é o formulário de lead ("Solicitar Análise de Perfil"), não "Entrar" — "Entrar" fica no nav como botão outline azul no light / âmbar no dark (visível, mas secundário) e no rodapé
+- Estrutura atual: Header (logo + "Mundo Milhas"/"Gestão de Milhas" à esquerda, nav + "Entrar" à direita) → Hero (título+parágrafo à esquerda, **imagem** à direita do mesmo tamanho do bloco título+subtítulo — placeholder de vídeo do YouTube que ainda vai entrar; botões centralizados abaixo dos dois) → programas parceiros (marquee) → **Números** (imagem à esquerda + estatísticas com contagem animada empilhadas à direita) → Como Funciona (5 etapas) → **Comparativo** (tabela pareada, ver abaixo) → O que está incluso → Resultados → Formulário de lead → **FAQ** (7 perguntas, quebra de objeções — ver abaixo) → Rodapé — **não existem mais** a seção "Dores" isolada (removida; virou a coluna esquerda do Comparativo) nem a seção "Benefícios"/"Por que delegar sua gestão de milhas" (removida; array `BENEFITS` também foi deletado do código)
+- Headline do hero (H1): "Acúmulo de milhas não é sorte. **É método!** E o método **é nosso** para fazer suas milhas trabalharem a seu favor." — dois trechos com destaque em gradiente (`from-blue-500 to-blue-700` no light, `dark:from-amber-400 dark:to-amber-600` no dark, `bg-clip-text text-transparent`): "É método!" e "é nosso"
 - Nav: logo à esquerda, links + botão "Entrar" agrupados à direita (`ml-auto`) — não tem CTA de conversão no nav (removido "Simular Minha Economia"; a conversão principal é só via `#analise-de-perfil`)
+- **Toda a página segue o padrão de par `blue-*` (light) + `dark:amber-*` (dark)** descrito na seção "Tema Dark/Light" — não é só o H1, é ícones, bordas, fundos de destaque, botões etc. Ao adicionar um elemento novo com cor de marca aqui, seguir o mesmo par.
 - **Números** (`STATS` + `STATS_IMAGE`): layout `lg:grid-cols-2` — uma única foto real (Unsplash) na coluna esquerda, os 3 itens de `STATS` empilhados com divisores (`divide-y`) na coluna direita. Valores vêm diretamente do usuário/dono do negócio — diferente de "inventar" (ver regra de honestidade abaixo), aqui é conteúdo real fornecido pelo próprio negócio. Anima com `StatCounter` (contagem de 0 até o valor, `onViewportEnter` do framer-motion, easing cúbico, ~1.6s) — pula a animação e mostra o valor final direto se `prefers-reduced-motion`
 - **Como Funciona** tem 5 etapas nessa ordem fixa: Onboarding Estratégico → Análise de Perfil → Acúmulo Inteligente → Emissão & Acompanhamento → Registro de Resultados. Grid `sm:grid-cols-2 lg:grid-cols-5`; conector animado (avião) calibrado pra 5 colunas (`left-[10%] right-[10%]`) — se o número de etapas mudar de novo, recalcular esses insets
-- **Comparativo** (`#comparativo`) é uma tabela de linhas pareadas, não duas listas independentes: `SELF_MANAGED_CONS[i]` (coluna "Gestão Própria", ícone `XCircle`) sempre aparece na mesma linha que seu contraponto `MANAGED_PROS[i]` (coluna "Gestão Mundo Milhas", ícone `CheckCircle2`, fundo `bg-amber-500/5`). **Os dois arrays precisam ter sempre o mesmo tamanho e ficar index-pareados** — ao adicionar/remover um item de dor, adicionar/remover o contraponto correspondente no mesmo índice
+- **Comparativo** (`#comparativo`) é uma tabela de linhas pareadas, não duas listas independentes: `SELF_MANAGED_CONS[i]` (coluna "Gestão Própria", ícone `XCircle`) sempre aparece na mesma linha que seu contraponto `MANAGED_PROS[i]` (coluna "Gestão Mundo Milhas", ícone `CheckCircle2`, fundo `bg-blue-600/15 dark:bg-amber-500/5` — bumped de `/5` pra `/15` no light porque ficava fraco demais pra diferenciar da coluna ao lado). **Os dois arrays precisam ter sempre o mesmo tamanho e ficar index-pareados** — ao adicionar/remover um item de dor, adicionar/remover o contraponto correspondente no mesmo índice
+- Seção "Perguntas Frequentes" tem 7 perguntas focadas em quebra de objeção (não é só FAQ genérico): já ter milhas acumuladas, complexidade (resposta aponta o time de especialistas), acesso a conta/cartão, investimento, fidelidade/multa de cancelamento (contrato é anual — necessário pra desenhar a estratégia — sem multa, cancelamento só ao fim do ciclo), como comprovar economia, sem viagem prevista no momento. Conteúdo vem de decisão de negócio explícita do usuário, não inventado — se for editar, confirmar a redação com ele antes
 
 ### Regra de honestidade de conteúdo (importante ao editar essa página)
 
@@ -371,7 +538,8 @@ Existem exatamente dois jeitos de uma senha ser definida. **Nunca criar um terce
 - Framework: **Vitest** + **fast-check** (PBT)
 - API: `cd api && npm run test`
 - Web: `cd web && npm run test:run`
-- 70 tasks concluídas, 20 propriedades de correção implementadas
+- 70 tasks concluídas, 20 propriedades de correção implementadas (planejamento original)
+- Estado atual: **82 testes na API** (12 arquivos, incluindo `banks.service.test.ts`, `loyaltyPrograms.service.test.ts`, `transferParities.service.test.ts`) e **15 testes no web** (5 arquivos) — todos passando
 - Mocks de env.ts usam `vi.mock('../../src/config/env.js', ...)` antes dos imports
 
 ---
@@ -386,7 +554,7 @@ Existem exatamente dois jeitos de uma senha ser definida. **Nunca criar um terce
 ✅ Página de login com validação  
 ✅ Dashboard com boas-vindas  
 ✅ Sidebar responsiva (desktop fixo, mobile overlay)  
-✅ Header com toggle dark/light  
+✅ Header com toggle dark/light (padrão hoje: light — ver seção "Tema Dark/Light")  
 ✅ Gestão de usuários (CRUD completo para Admin)  
 ✅ Email de boas-vindas via Resend ao cadastrar usuário  
 ✅ Docker multi-stage (Dockerfile + docker-compose)  
@@ -404,7 +572,17 @@ Existem exatamente dois jeitos de uma senha ser definida. **Nunca criar um terce
 ✅ Admin/Team define diretamente uma nova senha para Usuário/Team pelo diálogo "Editar" (`PUT /users/:id/password`), nunca para Admin — notifica por email
 ✅ Menu do avatar no Header (nome/papel, Meu Perfil, tema, Sair) substituindo a seção de usuário da Sidebar
 ✅ "Meu Perfil" self-service (nome/email/telefone/foto) para qualquer papel, com upload de foto redimensionada no client (base64 em `avatar_url`)
-✅ Home page pública reescrita como landing page comercial (cartão de visita): benefícios, como funciona, comparativo, resultados ilustrativos, FAQ, formulário de lead funcional (`POST /api/leads`, salva + notifica admin por email), contato dinâmico no rodapé
+✅ Home page pública reescrita como landing page comercial (cartão de visita): benefícios, como funciona, comparativo, resultados ilustrativos, FAQ, formulário de lead funcional (`POST /api/leads`, salva + notifica admin por email), contato dinâmico no rodapé  
+✅ Tema padrão trocado de dark para **light**; paleta de destaque em azul no light, âmbar preservado no dark (ver seção "Tema Dark/Light")  
+✅ Self-service de troca de senha logado (`PUT /auth/me/password`, seção "Alterar Senha" em Meu Perfil) — terceiro caminho de senha, com verificação da senha atual  
+✅ Componente `Dialog` corrigido pra nunca estourar a viewport (`max-h-[85vh]` + scroll interno, cabeçalho/fechar fixos) — correção global, vale pra todo diálogo do sistema  
+✅ Catálogo de **Bancos** e **Programas de Fidelidade de Bancos** (CRUD completo pra ADMIN, N:N entre si, leitura liberada a todo papel) — com upload de logo com recorte (`react-easy-crop`)  
+✅ Vínculo usuário↔banco (`UserBank`): autoatribuição em "Meu Perfil" (`PUT /auth/me/banks`) e atribuição por Admin/Team no diálogo "Editar Usuário" (`PUT /users/:id/banks`)  
+✅ **Paridade de Transferência** entre programas de fidelidade (`TransferParity`) — CRUD pra ADMIN, direcional, proporção configurável (ex. 1:1), seed inicial com 14 paridades reais  
+✅ Submenu "Cadastros" na Sidebar (ADMIN) agrupando Bancos / Programas de Fidelidade de Bancos / Paridade de Transferência, com auto-expansão pela rota ativa  
+✅ Ordenação clicável (`SortableTh`) em toda tela de listagem — server-side em Gestão de Usuários, client-side em Bancos/Programas/Paridade  
+✅ Busca nas telas de Bancos/Programas casando também o nome da entidade vinculada (banco↔programa), não só o nome da própria linha  
+✅ Seeds `npm run seed:banks` (~29 bancos brasileiros + programas) e `npm run seed:parities` (14 paridades de transferência) — ambos truncam antes de recriar, ver avisos na seção própria antes de rodar de novo
 
 ---
 
@@ -415,6 +593,7 @@ Existem exatamente dois jeitos de uma senha ser definida. **Nunca criar um terce
 - Regras de negócio configuráveis pelo Admin
 - Gestão completa de milhas dos clientes
 - Tela de "Gestão de Leads" pro Admin/Team ver e converter os leads capturados na Home page (hoje só existe a tabela `leads` + email de notificação, sem UI de listagem)
+- Catálogo de **Companhias Aéreas** e **Programas de Fidelidade de Cia Aérea** (Smiles, LATAM Pass etc.) — mesmo padrão do catálogo de Bancos/Programas de hoje, entraria como novo item dentro do submenu "Cadastros" da Sidebar (ver seção própria)
 
 ---
 

@@ -199,3 +199,29 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     next(err);
   }
 }
+
+/**
+ * PUT /auth/me/banks
+ *
+ * Self-service bank assignment — links the authenticated user's own account
+ * to one or more banks from the global catalog. Available to every role.
+ */
+export async function updateMyBanks(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { bankIds } = req.body as { bankIds?: unknown };
+
+    if (!Array.isArray(bankIds) || !bankIds.every((id) => typeof id === 'string')) {
+      res.status(400).json({ error: 'bankIds deve ser uma lista de ids' });
+      return;
+    }
+
+    const user = await authService.updateMyBanks(req.user.id, bankIds);
+    res.status(200).json({ user });
+  } catch (err) {
+    if (err instanceof AppError) {
+      res.status(err.statusCode).json({ error: err.message });
+      return;
+    }
+    next(err);
+  }
+}

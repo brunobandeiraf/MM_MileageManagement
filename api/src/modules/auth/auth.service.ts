@@ -16,6 +16,7 @@ export interface AuthUser {
   phone: string;
   avatar_url: string | null;
   role: 'ADMIN' | 'FUNCIONARIO' | 'USER';
+  banks: { id: string; name: string }[];
 }
 
 const AUTH_USER_SELECT = {
@@ -25,7 +26,32 @@ const AUTH_USER_SELECT = {
   phone: true,
   avatar_url: true,
   role: true,
+  banks: {
+    include: { bank: { select: { id: true, name: true } } },
+  },
 } as const;
+
+type UserWithBanks = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  avatar_url: string | null;
+  role: 'ADMIN' | 'FUNCIONARIO' | 'USER';
+  banks: { bank: { id: string; name: string } }[];
+};
+
+function toAuthUser(user: UserWithBanks): AuthUser {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    avatar_url: user.avatar_url,
+    role: user.role,
+    banks: user.banks.map((link) => link.bank),
+  };
+}
 
 /**
  * Validates email/password credentials.
@@ -53,14 +79,12 @@ export async function login(
     return null;
   }
 
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    phone: user.phone,
-    avatar_url: user.avatar_url,
-    role: user.role,
-  };
+  const withBanks = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: AUTH_USER_SELECT,
+  });
+
+  return toAuthUser(withBanks);
 }
 
 /**
@@ -126,7 +150,7 @@ export async function me(userId: string): Promise<AuthUser | null> {
     select: AUTH_USER_SELECT,
   });
 
-  return user;
+  return user ? toAuthUser(user) : null;
 }
 
 // Data URIs from a resized client-side image land well under this — it's a
@@ -154,11 +178,45 @@ export async function updateMe(
     }
   }
 
-  return prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id: userId },
     data,
     select: AUTH_USER_SELECT,
   });
+
+  return toAuthUser(updated);
+}
+
+/**
+ * Self-service bank assignment — a user linking one or more banks to their
+ * OWN account (e.g. "Banco do Brasil, Bradesco"). `bankIds` fully replaces
+ * the existing links, matching a multi-select form submit. Available to
+ * every role, including plain USER, since anyone can manage their own list.
+ */
+export async function updateMyBanks(userId: string, bankIds: string[]): Promise<AuthUser> {
+  if (bankIds.length > 0) {
+    const found = await prisma.bank.findMany({
+      where: { id: { in: bankIds } },
+      select: { id: true },
+    });
+    const foundIds = new Set(found.map((b) => b.id));
+    const missing = bankIds.filter((id) => !foundIds.has(id));
+    if (missing.length > 0) {
+      throw new AppError(400, `Banco(s) não encontrado(s): ${missing.join(', ')}`);
+    }
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.userBank.deleteMany({ where: { user_id: userId } });
+    if (bankIds.length > 0) {
+      await tx.userBank.createMany({
+        data: bankIds.map((bank_id) => ({ user_id: userId, bank_id })),
+      });
+    }
+    return tx.user.findUniqueOrThrow({ where: { id: userId }, select: AUTH_USER_SELECT });
+  });
+
+  return toAuthUser(updated);
 }
 
 /**

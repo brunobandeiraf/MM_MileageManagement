@@ -8,6 +8,9 @@ import authRouter from './modules/auth/auth.router.js';
 import usersRouter from './modules/users/users.router.js';
 import leadsRouter from './modules/leads/leads.router.js';
 import publicRouter from './modules/public/public.router.js';
+import banksRouter from './modules/banks/banks.router.js';
+import loyaltyProgramsRouter from './modules/loyaltyPrograms/loyaltyPrograms.router.js';
+import transferParitiesRouter from './modules/transferParities/transferParities.router.js';
 
 export const app = express();
 
@@ -31,6 +34,9 @@ app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/leads', leadsRouter);
 app.use('/api/public', publicRouter);
+app.use('/api/banks', banksRouter);
+app.use('/api/loyalty-programs', loyaltyProgramsRouter);
+app.use('/api/transfer-parities', transferParitiesRouter);
 
 // ─── Global error handler ─────────────────────────────────────────
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

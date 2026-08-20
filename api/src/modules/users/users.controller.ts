@@ -1,5 +1,6 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import * as usersService from './users.service.js';
+import { USER_SORT_FIELDS, type UserSortField, type SortOrder } from './users.service.js';
 import { AppError } from '../../utils/errors.js';
 import { isValidPhone } from '../../utils/phone.js';
 import { MIN_PASSWORD_LENGTH } from '../../utils/password.js';
@@ -16,7 +17,21 @@ export async function listUsers(
     const limit = parseInt((req.query['limit'] as string) ?? '20', 10) || 20;
     const search = (req.query['search'] as string) || undefined;
 
-    const result = await usersService.listUsers(page, limit, req.user.role, search);
+    const sortByRaw = req.query['sortBy'] as string | undefined;
+    if (sortByRaw && !USER_SORT_FIELDS.includes(sortByRaw as UserSortField)) {
+      res.status(400).json({ error: `sortBy inválido. Use um de: ${USER_SORT_FIELDS.join(', ')}` });
+      return;
+    }
+    const sortBy = (sortByRaw as UserSortField | undefined) ?? 'created_at';
+
+    const sortOrderRaw = req.query['sortOrder'] as string | undefined;
+    if (sortOrderRaw && sortOrderRaw !== 'asc' && sortOrderRaw !== 'desc') {
+      res.status(400).json({ error: 'sortOrder inválido. Use "asc" ou "desc"' });
+      return;
+    }
+    const sortOrder = (sortOrderRaw as SortOrder | undefined) ?? 'asc';
+
+    const result = await usersService.listUsers(page, limit, req.user.role, search, sortBy, sortOrder);
     res.status(200).json(result);
   } catch (err) {
     if (err instanceof AppError) {
@@ -149,6 +164,33 @@ export async function setPassword(
     }
 
     const user = await usersService.setUserPassword(id, password, req.user.role);
+    res.status(200).json(user);
+  } catch (err) {
+    if (err instanceof AppError) {
+      res.status(err.statusCode).json({ error: err.message });
+      return;
+    }
+    next(err);
+  }
+}
+
+// ─── PUT /users/:id/banks ─────────────────────────────────────────
+
+export async function setUserBanks(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+    const { bankIds } = req.body as { bankIds?: unknown };
+
+    if (!Array.isArray(bankIds) || !bankIds.every((bankId) => typeof bankId === 'string')) {
+      res.status(400).json({ error: 'bankIds deve ser uma lista de ids' });
+      return;
+    }
+
+    const user = await usersService.setUserBanks(id, bankIds, req.user.role);
     res.status(200).json(user);
   } catch (err) {
     if (err instanceof AppError) {

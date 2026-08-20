@@ -14,6 +14,7 @@ function makeUser(overrides: Partial<User> & Pick<User, 'id' | 'name' | 'role'>)
     email: 'user@test.com',
     phone: '(11) 91234-5678',
     avatar_url: null,
+    banks: [],
     ...overrides,
   };
 }
@@ -50,6 +51,7 @@ const loadedNoUser: AuthContextValue = {
   logout: vi.fn(),
   updateProfile: vi.fn(),
   changePassword: vi.fn(),
+  updateMyBanks: vi.fn(),
 };
 
 describe('Property 9: Redirecionamento preserva rota destino', () => {
@@ -86,6 +88,7 @@ describe('Property 10: Controle de acesso por papel', () => {
             logout: vi.fn(),
             updateProfile: vi.fn(),
             changePassword: vi.fn(),
+            updateMyBanks: vi.fn(),
           };
           const { unmount } = renderWithAuth(userAuth, '/private', ['ADMIN']);
           expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();
@@ -111,6 +114,7 @@ describe('Property 10: Controle de acesso por papel', () => {
             logout: vi.fn(),
             updateProfile: vi.fn(),
             changePassword: vi.fn(),
+            updateMyBanks: vi.fn(),
           };
           const { unmount } = renderWithAuth(adminAuth, '/private', ['ADMIN']);
           expect(screen.getByTestId('protected-content')).toBeInTheDocument();
@@ -136,6 +140,7 @@ describe('Property 10: Controle de acesso por papel', () => {
             logout: vi.fn(),
             updateProfile: vi.fn(),
             changePassword: vi.fn(),
+            updateMyBanks: vi.fn(),
           };
           const { unmount } = renderWithAuth(funcionarioAuth, '/private', ['ADMIN', 'FUNCIONARIO']);
           expect(screen.getByTestId('protected-content')).toBeInTheDocument();
@@ -161,6 +166,7 @@ describe('Property 10: Controle de acesso por papel', () => {
             logout: vi.fn(),
             updateProfile: vi.fn(),
             changePassword: vi.fn(),
+            updateMyBanks: vi.fn(),
           };
           const { unmount } = renderWithAuth(userAuth, '/private', ['ADMIN', 'FUNCIONARIO']);
           expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();

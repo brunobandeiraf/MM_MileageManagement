@@ -7,6 +7,10 @@ import { AppError } from '../../utils/errors.js';
 export type Role = 'ADMIN' | 'FUNCIONARIO' | 'USER';
 export type CreatableRole = 'ADMIN' | 'FUNCIONARIO' | 'USER';
 
+export const USER_SORT_FIELDS = ['name', 'email', 'phone', 'role', 'created_at'] as const;
+export type UserSortField = (typeof USER_SORT_FIELDS)[number];
+export type SortOrder = 'asc' | 'desc';
+
 // ─── DTO ─────────────────────────────────────────────────────────────────────
 
 export type UserDTO = {
@@ -16,18 +20,22 @@ export type UserDTO = {
   phone: string;
   role: Role;
   created_at: Date;
+  banks: { id: string; name: string }[];
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function toDTO(user: {
+type UserWithBanks = {
   id: string;
   name: string;
   email: string;
   phone: string;
   role: Role;
   created_at: Date;
-}): UserDTO {
+  banks: { bank: { id: string; name: string } }[];
+};
+
+function toDTO(user: UserWithBanks): UserDTO {
   return {
     id: user.id,
     name: user.name,
@@ -35,6 +43,7 @@ function toDTO(user: {
     phone: user.phone,
     role: user.role,
     created_at: user.created_at,
+    banks: user.banks.map((link) => link.bank),
   };
 }
 
@@ -45,6 +54,9 @@ const SELECT_FIELDS = {
   phone: true,
   role: true,
   created_at: true,
+  banks: {
+    include: { bank: { select: { id: true, name: true } } },
+  },
 } as const;
 
 /**
@@ -58,14 +70,17 @@ function isHiddenFromRequester(targetRole: Role, requesterRole: Role): boolean {
 // ─── Service ─────────────────────────────────────────────────────────────────
 
 /**
- * Lists users with pagination and optional name search. Never exposes password_hash.
+ * Lists users with pagination, optional name search, and sorting by any of
+ * USER_SORT_FIELDS (defaults to created_at asc). Never exposes password_hash.
  * FUNCIONARIO requesters never see the ADMIN account in the results.
  */
 export async function listUsers(
   page: number,
   limit: number,
   requesterRole: Role,
-  search?: string
+  search?: string,
+  sortBy: UserSortField = 'created_at',
+  sortOrder: SortOrder = 'asc'
 ): Promise<{ data: UserDTO[]; pagination: { page: number; limit: number; total: number } }> {
   const skip = (page - 1) * limit;
 
@@ -79,7 +94,7 @@ export async function listUsers(
       where,
       skip,
       take: limit,
-      orderBy: { created_at: 'asc' },
+      orderBy: { [sortBy]: sortOrder },
       select: SELECT_FIELDS,
     }),
     prisma.user.count({ where }),
@@ -251,6 +266,49 @@ export async function setUserPassword(
   } catch (err) {
     console.error('[users.service] Falha ao enviar email de notificação de senha alterada:', err);
   }
+
+  return toDTO(updated);
+}
+
+/**
+ * Replaces the full set of banks linked to a user — an ADMIN or FUNCIONARIO
+ * assigning banks to a user they manage. Same visibility rule as the rest of
+ * this module: hidden (404) if a FUNCIONARIO targets the ADMIN.
+ *
+ * `bankIds` fully replaces the existing links (matching a multi-select form
+ * submit) rather than merging with them.
+ */
+export async function setUserBanks(
+  id: string,
+  bankIds: string[],
+  requesterRole: Role
+): Promise<UserDTO> {
+  const existing = await prisma.user.findUnique({ where: { id } });
+  if (!existing || isHiddenFromRequester(existing.role, requesterRole)) {
+    throw new AppError(404, 'Usuário não encontrado');
+  }
+
+  if (bankIds.length > 0) {
+    const found = await prisma.bank.findMany({
+      where: { id: { in: bankIds } },
+      select: { id: true },
+    });
+    const foundIds = new Set(found.map((b) => b.id));
+    const missing = bankIds.filter((bankId) => !foundIds.has(bankId));
+    if (missing.length > 0) {
+      throw new AppError(400, `Banco(s) não encontrado(s): ${missing.join(', ')}`);
+    }
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.userBank.deleteMany({ where: { user_id: id } });
+    if (bankIds.length > 0) {
+      await tx.userBank.createMany({
+        data: bankIds.map((bank_id) => ({ user_id: id, bank_id })),
+      });
+    }
+    return tx.user.findUniqueOrThrow({ where: { id }, select: SELECT_FIELDS });
+  });
 
   return toDTO(updated);
 }

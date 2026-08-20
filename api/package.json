@@ -16,7 +16,9 @@
     "lint": "eslint . --ext .ts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "seed:banks": "tsx prisma/seedBanks.ts",
+    "seed:parities": "tsx prisma/seedTransferParities.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

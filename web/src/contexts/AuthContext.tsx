@@ -3,6 +3,11 @@ import { apiGet, apiPost, apiPut } from '../services/api'
 
 export type Role = 'ADMIN' | 'FUNCIONARIO' | 'USER'
 
+export type Bank = {
+  id: string
+  name: string
+}
+
 export type User = {
   id: string
   name: string
@@ -10,6 +15,7 @@ export type User = {
   phone: string
   avatar_url: string | null
   role: Role
+  banks: Bank[]
 }
 
 export type ProfileUpdate = {
@@ -26,6 +32,7 @@ export type AuthContextValue = {
   logout: () => Promise<void>
   updateProfile: (data: ProfileUpdate) => Promise<void>
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>
+  updateMyBanks: (bankIds: string[]) => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue>({
@@ -35,6 +42,7 @@ export const AuthContext = createContext<AuthContextValue>({
   logout: async () => {},
   updateProfile: async () => {},
   changePassword: async () => {},
+  updateMyBanks: async () => {},
 })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -73,8 +81,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await apiPut('/auth/me/password', { currentPassword, newPassword })
   }
 
+  async function updateMyBanks(bankIds: string[]): Promise<void> {
+    const { user } = await apiPut<{ user: User }>('/auth/me/banks', { bankIds })
+    setUser(user)
+  }
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, updateProfile, changePassword }}>
+    <AuthContext.Provider
+      value={{ user, isLoading, login, logout, updateProfile, changePassword, updateMyBanks }}
+    >
       {children}
     </AuthContext.Provider>
   )

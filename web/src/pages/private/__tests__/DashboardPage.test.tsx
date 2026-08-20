@@ -17,6 +17,7 @@ function renderDashboard(user: User) {
     logout: vi.fn(),
     updateProfile: vi.fn(),
     changePassword: vi.fn(),
+    updateMyBanks: vi.fn(),
   };
   return render(
     <ThemeContext.Provider value={mockTheme}>
@@ -43,7 +44,7 @@ describe('Property 20: Mensagem de boas-vindas contém o nome do usuário autent
           role: fc.constantFrom('ADMIN' as const, 'USER' as const),
         }),
         (partialUser) => {
-          const user: User = { email: 'user@test.com', phone: '(11) 91234-5678', avatar_url: null, ...partialUser };
+          const user: User = { email: 'user@test.com', phone: '(11) 91234-5678', avatar_url: null, banks: [], ...partialUser };
           const { unmount } = renderDashboard(user);
           const heading = screen.getByRole('heading', { level: 1 });
           expect(heading.textContent).toContain(user.name);

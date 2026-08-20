@@ -3,6 +3,7 @@ import { Camera } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatPhone } from '../../lib/phone'
 import { resizeImageToDataUrl } from '../../lib/image'
+import { apiGet } from '../../services/api'
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -15,6 +16,12 @@ import {
   DialogFooter,
   DialogDescription,
 } from '../ui/dialog'
+import { BankMultiSelect } from './BankMultiSelect'
+
+interface BankRef {
+  id: string
+  name: string
+}
 
 interface ProfileDialogProps {
   open: boolean
@@ -27,7 +34,7 @@ interface ProfileDialogProps {
  * avatar menu.
  */
 export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
-  const { user, updateProfile, changePassword } = useAuth()
+  const { user, updateProfile, changePassword, updateMyBanks } = useAuth()
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   const [name, setName] = React.useState('')
@@ -44,6 +51,12 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const [passwordSuccess, setPasswordSuccess] = React.useState(false)
   const [isChangingPassword, setIsChangingPassword] = React.useState(false)
 
+  const [banks, setBanks] = React.useState<BankRef[]>([])
+  const [bankIds, setBankIds] = React.useState<Set<string>>(new Set())
+  const [bankError, setBankError] = React.useState<string | null>(null)
+  const [bankSuccess, setBankSuccess] = React.useState(false)
+  const [isSavingBanks, setIsSavingBanks] = React.useState(false)
+
   React.useEffect(() => {
     if (open && user) {
       setName(user.name)
@@ -56,6 +69,12 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
       setConfirmNewPassword('')
       setPasswordError(null)
       setPasswordSuccess(false)
+      setBankIds(new Set(user.banks.map((b) => b.id)))
+      setBankError(null)
+      setBankSuccess(false)
+      apiGet<{ data: BankRef[] }>('/banks')
+        .then((res) => setBanks(res.data))
+        .catch(() => setBanks([]))
     }
   }, [open, user])
 
@@ -118,6 +137,30 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
       setPasswordError(err instanceof Error ? err.message : 'Erro ao alterar senha.')
     } finally {
       setIsChangingPassword(false)
+    }
+  }
+
+  function toggleBank(bankId: string) {
+    setBankIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(bankId)) next.delete(bankId)
+      else next.add(bankId)
+      return next
+    })
+  }
+
+  async function handleBanksSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setBankError(null)
+    setBankSuccess(false)
+    setIsSavingBanks(true)
+    try {
+      await updateMyBanks(Array.from(bankIds))
+      setBankSuccess(true)
+    } catch (err) {
+      setBankError(err instanceof Error ? err.message : 'Erro ao atualizar bancos.')
+    } finally {
+      setIsSavingBanks(false)
     }
   }
 
@@ -264,6 +307,34 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
             <div className="flex justify-end">
               <Button type="submit" variant="outline" disabled={isChangingPassword}>
                 {isChangingPassword ? 'Alterando…' : 'Alterar Senha'}
+              </Button>
+            </div>
+          </form>
+        </div>
+
+        <div className="border-t border-border pt-4">
+          <h3 className="text-sm font-semibold text-foreground">Meus Bancos</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Selecione os bancos vinculados à sua conta, conforme o catálogo cadastrado pelo administrador.
+          </p>
+
+          <form onSubmit={handleBanksSubmit} className="mt-4 space-y-4">
+            <BankMultiSelect
+              banks={banks}
+              selectedIds={bankIds}
+              onToggle={toggleBank}
+              disabled={isSavingBanks}
+              idPrefix="profile-bank"
+            />
+
+            {bankError && <p className="text-sm text-destructive">{bankError}</p>}
+            {bankSuccess && (
+              <p className="text-sm text-emerald-600 dark:text-emerald-400">Bancos atualizados com sucesso.</p>
+            )}
+
+            <div className="flex justify-end">
+              <Button type="submit" variant="outline" disabled={isSavingBanks}>
+                {isSavingBanks ? 'Salvando…' : 'Salvar Bancos'}
               </Button>
             </div>
           </form>

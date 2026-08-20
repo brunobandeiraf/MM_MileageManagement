@@ -17,6 +17,7 @@ function makeUser(overrides: Partial<User> & Pick<User, 'id' | 'name' | 'role'>)
     email: 'user@test.com',
     phone: '(11) 91234-5678',
     avatar_url: null,
+    banks: [],
     ...overrides,
   };
 }
@@ -29,6 +30,7 @@ function renderSidebar(user: User, initialPath = '/dashboard') {
     logout: vi.fn(),
     updateProfile: vi.fn(),
     changePassword: vi.fn(),
+    updateMyBanks: vi.fn(),
   };
   return render(
     <ThemeContext.Provider value={mockTheme}>
